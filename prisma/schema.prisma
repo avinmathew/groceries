@@ -1,0 +1,84 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ShoppingList {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items GroceryItem[]
+
+  @@map("shopping_lists")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items GroceryItem[]
+
+  @@map("categories")
+}
+
+model GroceryItem {
+  id            String   @id @default(cuid())
+  name          String
+  quantity      Int      @default(1)
+  notes         String?
+  isCompleted   Boolean  @default(false)
+  completedAt   DateTime?
+  categoryId    String?
+  shoppingListId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  shoppingList  ShoppingList   @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  productLinks  ProductLink[]
+
+  @@map("grocery_items")
+}
+
+model ProductLink {
+  id            String   @id @default(cuid())
+  url           String
+  store         String   // "woolworths" | "coles" | "aldi"
+  regularPrice  Float?
+  discountPrice Float?
+  lastRefreshed DateTime?
+  groceryItemId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  groceryItem   GroceryItem @relation(fields: [groceryItemId], references: [id], onDelete: Cascade)
+  priceHistory  PriceHistory[]
+
+  @@map("product_links")
+}
+
+model PriceHistory {
+  id            String   @id @default(cuid())
+  regularPrice  Float?
+  discountPrice Float?
+  recordedAt    DateTime @default(now())
+  productLinkId String
+  createdAt     DateTime @default(now())
+
+  productLink   ProductLink @relation(fields: [productLinkId], references: [id], onDelete: Cascade)
+
+  @@index([productLinkId, recordedAt])
+  @@map("price_history")
+}
