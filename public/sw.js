@@ -1,9 +1,8 @@
 const CACHE_NAME = 'mygroceries-v1';
 const urlsToCache = [
-  '/',
-  '/manifest.json',
-  '/icon-192x192.svg',
-  '/icon-512x512.svg'
+  '/groceries/manifest.json',
+  '/groceries/icon-192x192.svg',
+  '/groceries/icon-512x512.svg'
 ];
 
 // Install event - cache resources

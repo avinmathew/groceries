@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { BASE_PATH } from "@/lib/utils";
 import { updateShoppingList } from "@/app/actions/shopping-lists";
 
 type ShoppingList = {
@@ -68,7 +69,7 @@ export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingL
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/shopping-lists/${shoppingList.id}`, {
+      const response = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`, {
         method: "DELETE",
       });
 

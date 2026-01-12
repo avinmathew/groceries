@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from 'react';
+import { BASE_PATH } from '@/lib/utils';
 
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
-        .register('/sw.js')
+        .register(`${BASE_PATH}/sw.js`)
         .then((registration) => {
           console.log('SW registered: ', registration);
         })

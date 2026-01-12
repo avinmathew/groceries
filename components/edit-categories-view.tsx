@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { BASE_PATH } from "@/lib/utils";
 
 type Category = {
   id: string;
@@ -36,7 +37,7 @@ export function EditCategoriesView({ initialCategories }: { initialCategories: C
 
     setIsAdding(true);
     try {
-      const response = await fetch("/api/categories", {
+      const response = await fetch(`${BASE_PATH}/api/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newCategoryName.trim() }),
@@ -69,7 +70,7 @@ export function EditCategoriesView({ initialCategories }: { initialCategories: C
     }
 
     try {
-      const response = await fetch(`/api/categories/${categoryId}`, {
+      const response = await fetch(`${BASE_PATH}/api/categories/${categoryId}`, {
         method: "DELETE",
       });
 

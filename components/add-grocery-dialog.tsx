@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { BASE_PATH } from "@/lib/utils";
 
 type Grocery = {
   name: string;
@@ -36,7 +37,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
 
   useEffect(() => {
     // Fetch all existing groceries for autocomplete
-    fetch("/api/groceries")
+    fetch(`${BASE_PATH}/api/groceries`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -62,7 +63,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
   const handleSelectGrocery = async (groceryName: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/grocery-items", {
+      const response = await fetch(`${BASE_PATH}/api/grocery-items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

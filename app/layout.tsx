@@ -9,15 +9,15 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "MyGroceries",
   description: "A grocery shopping list app",
-  manifest: "/manifest.json",
+  manifest: "/groceries/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "MyGroceries",
   },
   icons: {
-    icon: "/icon-192x192.svg",
-    apple: "/icon-192x192.svg",
+    icon: "/groceries/icon-192x192.svg",
+    apple: "/groceries/icon-192x192.svg",
   },
 };
 

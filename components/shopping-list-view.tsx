@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { GroceryItemRow } from "@/components/grocery-item-row";
 import { AddGroceryDialog } from "@/components/add-grocery-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { BASE_PATH } from "@/lib/utils";
 
 type ShoppingList = {
   id: string;
@@ -55,7 +56,7 @@ export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingList 
   const handleRefreshPrices = async () => {
     setIsRefreshing(true);
     try {
-      const response = await fetch("/api/refresh-prices", {
+      const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -82,7 +83,7 @@ export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingList 
 
   const handleToggleComplete = async (itemId: string, isCompleted: boolean) => {
     try {
-      const response = await fetch(`/api/grocery-items/${itemId}`, {
+      const response = await fetch(`${BASE_PATH}/api/grocery-items/${itemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isCompleted: !isCompleted }),

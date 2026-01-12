@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { BASE_PATH } from "@/lib/utils";
 
 export function CreateShoppingListDialog() {
   const [open, setOpen] = useState(false);
@@ -29,7 +30,7 @@ export function CreateShoppingListDialog() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("/api/shopping-lists", {
+      const response = await fetch(`${BASE_PATH}/api/shopping-lists`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),

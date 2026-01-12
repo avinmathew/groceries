@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { BASE_PATH } from "@/lib/utils";
 
 type GroceryItem = {
   id: string;
@@ -38,7 +39,7 @@ export function GroceryItemRow({
     if (!confirm("Are you sure you want to delete this item?")) return;
 
     try {
-      const response = await fetch(`/api/grocery-items/${item.id}`, {
+      const response = await fetch(`${BASE_PATH}/api/grocery-items/${item.id}`, {
         method: "DELETE",
       });
 

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { BASE_PATH } from "@/lib/utils";
 
 type Category = {
   id: string;
@@ -180,7 +181,7 @@ export function GroceryItemEditView({
   const loadPriceHistory = useCallback(async () => {
     setIsLoadingHistory(true);
     try {
-      const response = await fetch(`/api/grocery-items/${initialItem.id}/price-history`);
+      const response = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}/price-history`);
       if (response.ok) {
         const history = await response.json();
         setPriceHistory(history);
@@ -209,7 +210,7 @@ export function GroceryItemEditView({
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/grocery-items/${initialItem.id}`, {
+      const response = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -243,7 +244,7 @@ export function GroceryItemEditView({
     if (!newLinkUrl.trim()) return;
 
     try {
-      const response = await fetch("/api/product-links", {
+      const response = await fetch(`${BASE_PATH}/api/product-links`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -273,7 +274,7 @@ export function GroceryItemEditView({
 
   const handleDeleteLink = async (linkId: string) => {
     try {
-      const response = await fetch(`/api/product-links/${linkId}`, {
+      const response = await fetch(`${BASE_PATH}/api/product-links/${linkId}`, {
         method: "DELETE",
       });
 
@@ -296,7 +297,7 @@ export function GroceryItemEditView({
   const handleRefreshPrices = async () => {
     setIsRefreshing(true);
     try {
-      const response = await fetch("/api/refresh-prices", {
+      const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ groceryItemId: initialItem.id }),
@@ -305,7 +306,7 @@ export function GroceryItemEditView({
       if (!response.ok) throw new Error("Failed to refresh prices");
 
       // Fetch the updated grocery item to get the new prices
-      const updatedItemResponse = await fetch(`/api/grocery-items/${initialItem.id}`);
+      const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}`);
       if (updatedItemResponse.ok) {
         const updatedItem = await updatedItemResponse.json();
         setProductLinks(updatedItem.productLinks || []);
@@ -332,7 +333,7 @@ export function GroceryItemEditView({
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/grocery-items/${initialItem.id}`, {
+      const response = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}`, {
         method: "DELETE",
       });
 
