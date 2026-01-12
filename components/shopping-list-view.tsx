@@ -152,7 +152,7 @@ export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingList 
         </div>
       </header>
 
-      <main className="container mx-auto p-4">
+      <main className="container mx-auto">
         <div>
           {/* Category Groups */}
           {shoppingList.categoryGroups.map((group) => (

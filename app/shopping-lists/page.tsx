@@ -25,7 +25,7 @@ export default async function ShoppingListsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-10 border-b bg-background">
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
           <h1 className="text-xl font-semibold">MyGroceries</h1>
           <div className="flex items-center gap-2">
@@ -44,7 +44,7 @@ export default async function ShoppingListsPage() {
           {shoppingLists.map((list) => (
             <div
               key={list.id}
-              className="flex items-center justify-between rounded-lg border px-4 py-2 hover:bg-accent"
+              className="flex items-center justify-between rounded-lg border px-4 py-2 hover:bg-accent min-h-[57px]"
             >
               <Link href={`/shopping-lists/${list.id}`} className="flex-1">
                 <div className="flex items-center gap-3">
