@@ -33,10 +33,10 @@ async function refreshGroceryItemPrices(groceryItemId: string) {
 
   for (const link of groceryItem.productLinks) {
     try {
-      // Always refresh if prices are missing, otherwise respect the 6-day cooldown
+      // Always refresh if prices are missing, otherwise respect the weekly refresh schedule (Wednesdays)
       const hasNoPrice = link.regularPrice === null && link.discountPrice === null;
       if (!hasNoPrice && !shouldRefreshPrice(link.lastRefreshed)) {
-        console.log(`Skipping ${link.store} link ${link.id} - refreshed less than 6 days ago`);
+        console.log(`Skipping ${link.store} link ${link.id} - refreshed after previous Wednesday`);
         continue;
       }
 
@@ -89,13 +89,21 @@ async function refreshGroceryItemPrices(groceryItemId: string) {
 }
 
 async function refreshAllPrices() {
+  // Calculate the last Wednesday (same logic as shouldRefreshPrice)
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0 = Sunday, 3 = Wednesday
+  const daysSinceWednesday = (dayOfWeek - 3 + 7) % 7;
+  const lastWednesday = new Date(now);
+  lastWednesday.setDate(now.getDate() - daysSinceWednesday);
+  lastWednesday.setHours(0, 0, 0, 0); // Set to start of day
+
   const allLinks = await prisma.productLink.findMany({
     where: {
       OR: [
         { lastRefreshed: null },
         {
           lastRefreshed: {
-            lt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+            lt: lastWednesday,
           },
         },
       ],
