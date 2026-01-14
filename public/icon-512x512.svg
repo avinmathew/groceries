@@ -1,4 +1,60 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" fill="#99C556"/>
-  <text x="256" y="300" font-family="Arial, sans-serif" font-size="320" font-weight="bold" text-anchor="middle" fill="white">G</text>
-</svg>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="512"
+   height="512"
+   viewBox="0 0 135.46666 135.46667"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+     id="defs1" /><g
+     id="layer1"><rect
+       style="fill:#99c556;fill-opacity:1;stroke:none;stroke-width:10.0209;stroke-linecap:round;stroke-opacity:1;paint-order:stroke fill markers"
+       id="rect1"
+       width="135.46666"
+       height="135.46666"
+       x="0"
+       y="-5.2939559e-23" /><text
+       xml:space="preserve"
+       style="font-size:22.5778px;font-family:'Last Christmas PERSONAL USE';-inkscape-font-specification:'Last Christmas PERSONAL USE';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#dfb488;stroke:#8a0000;stroke-width:2.5;paint-order:stroke fill markers"
+       x="11.637418"
+       y="29.011591"
+       id="text1"><tspan
+         id="tspan1"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:22.5778px;font-family:'Berlin Sans FB';-inkscape-font-specification:'Berlin Sans FB';fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:2.5"
+         x="11.637418"
+         y="29.011591">MyGroceries</tspan></text><g
+       id="g4"
+       style="stroke:#ffffff;stroke-opacity:1"
+       transform="matrix(0.39607429,0,0,0.39607429,45.742304,49.284885)"><path
+         style="fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:15;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
+         d="m -62.448673,-11.637 c 0,0 8.440045,-0.0857 25.370639,0 16.930595,0.0857 19.126017,1.9453542 25.604523,22.946602 6.4785066,21.001248 26.095062,88.636055 33.497186,114.675708 7.402124,26.03966 17.163941,25.71497 40.097185,25.95669 22.933244,0.24172 51.30298,0 51.30298,0"
+         id="path1" /><circle
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:2.84375;stroke-opacity:1;paint-order:stroke fill markers"
+         id="path2"
+         cx="44.910595"
+         cy="176.20033"
+         r="14.915563" /><circle
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:2.84375;stroke-opacity:1;paint-order:stroke fill markers"
+         id="path2-8"
+         cx="93.997322"
+         cy="176.27394"
+         r="14.915563" /><path
+         style="fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:15;stroke-linecap:round;stroke-opacity:1;paint-order:stroke fill markers"
+         d="m -1.6390727,37.534321 c 0,0 87.7781937,-0.310786 110.3096027,0 22.53141,0.310785 29.72128,-1.563472 22.61921,14.752102 -7.10208,16.315573 -19.20774,42.393399 -25.40564,55.236747 -6.197897,12.84336 -2.76811,11.63461 -18.029796,11.63742 -15.261682,0.003 -64.743377,1e-5 -64.743377,1e-5"
+         id="path3" /><path
+         style="fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:10;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
+         d="M 5.5728475,65.890727 125.71689,66.054633 v 0"
+         id="path4" /><path
+         style="fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:10;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
+         d="M 15.096551,90.71897 112.9492,90.882876"
+         id="path4-1" /><path
+         style="fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:10;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
+         d="M 48.1584,35.665595 V 119.42221"
+         id="path4-1-2" /><path
+         style="fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:10;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
+         d="M 81.664157,36.238121 V 119.99474"
+         id="path4-1-2-2" /></g></g></svg>
