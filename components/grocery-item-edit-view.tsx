@@ -193,10 +193,10 @@ export function GroceryItemEditView({
     }
   }, [initialItem.id]);
 
-  // Load price history on mount and after price refresh
+  // Load price history on mount
   useEffect(() => {
     loadPriceHistory();
-  }, [productLinks, loadPriceHistory]);
+  }, [loadPriceHistory]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -297,6 +297,7 @@ export function GroceryItemEditView({
   const handleRefreshPrices = async () => {
     setIsRefreshing(true);
     try {
+      // Start the refresh process
       const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -305,27 +306,38 @@ export function GroceryItemEditView({
 
       if (!response.ok) throw new Error("Failed to refresh prices");
 
-      // Fetch the updated grocery item to get the new prices
-      const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}`);
-      if (updatedItemResponse.ok) {
-        const updatedItem = await updatedItemResponse.json();
-        setProductLinks(updatedItem.productLinks || []);
-        // Reload price history after refresh
-        await loadPriceHistory();
-      }
+      // Poll for updates every 2 seconds during refresh
+      const pollInterval = setInterval(async () => {
+        try {
+          const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}`);
+          if (updatedItemResponse.ok) {
+            const updatedItem = await updatedItemResponse.json();
+            setProductLinks(updatedItem.productLinks || []);
+          }
+        } catch (error) {
+          console.error("Error polling for updates:", error);
+        }
+      }, 2000);
 
-      toast({
-        title: "Success",
-        description: "Prices refreshed successfully",
-      });
-      router.refresh();
+      // Stop polling after 60 seconds (assuming refresh won't take longer)
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setIsRefreshing(false);
+        // Reload price history once at the end
+        loadPriceHistory();
+        toast({
+          title: "Success",
+          description: "Prices refreshed successfully",
+        });
+        router.refresh();
+      }, 60000);
+
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to refresh prices",
         variant: "destructive",
       });
-    } finally {
       setIsRefreshing(false);
     }
   };
