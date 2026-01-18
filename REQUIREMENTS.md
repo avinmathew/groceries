@@ -63,9 +63,9 @@ Prices are tracked over time, and a chart/table shows how prices change over tim
 
 When the Refresh Prices button is clicked:
 If done from the Info/Edit view, it only refreshes for that particular grocery.
-If done from the Main interface, it refreshes all groceries
-
+If done from the Main interface, it refreshes all groceries that aren't crossed out.
 If price refresh has been done since the last Wednesday, then the price won't be refreshed. This is because stores only change discounted items on Wednesdays.
+Prices are refreshed in parallel across stores, but sequential for a store.
 
 ## Admin page
 

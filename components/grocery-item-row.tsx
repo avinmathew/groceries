@@ -92,6 +92,10 @@ export function GroceryItemRow({
     const isLowest = price === overallLowest;
     const storeLower = store.toLowerCase();
     
+    // Check if this store has a discount price
+    const storeLinks = item.productLinks.filter((link) => link.store.toLowerCase() === storeLower);
+    const hasDiscount = storeLinks.some((link) => link.discountPrice !== null);
+    
     return (
       <div className={`flex items-center gap-1 ${isLowest ? "font-semibold text-primary" : ""}`}>
         <Image
@@ -101,7 +105,13 @@ export function GroceryItemRow({
           height={20}
           className="object-contain"
         />
-        <span className={isLowest ? "text-primary" : ""}>${price.toFixed(2)}</span>
+        {hasDiscount ? (
+          <Badge style={{ backgroundColor: '#ffda00', color: 'black', fontSize: '1rem', padding: '0.2rem 0.375rem' }}>
+            ${price.toFixed(2)}
+          </Badge>
+        ) : (
+          <span className={isLowest ? "text-primary" : ""}>${price.toFixed(2)}</span>
+        )}
       </div>
     );
   };

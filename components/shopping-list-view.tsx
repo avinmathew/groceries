@@ -59,37 +59,35 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   const handleRefreshPrices = async () => {
     setIsRefreshing(true);
     try {
-      // Start the refresh process
+      // Collect IDs of all active (non-completed) items
+      const activeItemIds = shoppingList.categoryGroups
+        .flatMap(group => group.items.map(item => item.id));
+
+      // Start the refresh process - this waits until scraping is complete
       const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ groceryItemIds: activeItemIds }),
       });
 
       if (!response.ok) throw new Error("Failed to refresh prices");
 
-      // Poll for updates every 2 seconds during refresh
-      const pollInterval = setInterval(async () => {
-        try {
-          const updatedResponse = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
-          if (updatedResponse.ok) {
-            const updatedShoppingList = await updatedResponse.json();
-            setShoppingList(updatedShoppingList);
-          }
-        } catch (error) {
-          console.error("Error polling for updates:", error);
-        }
-      }, 2000);
+      // Refresh is complete, now fetch the updated shopping list data
+      // Add cache-busting parameter to ensure fresh data
+      const updatedResponse = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}?t=${Date.now()}`, {
+        cache: 'no-store'
+      });
+      if (updatedResponse.ok) {
+        const updatedShoppingList = await updatedResponse.json();
+        // Force a complete state update by creating a new object
+        setShoppingList({ ...updatedShoppingList });
+      }
 
-      // Stop polling after 60 seconds (assuming refresh won't take longer)
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        setIsRefreshing(false);
-        toast({
-          title: "Success",
-          description: "Prices refreshed successfully",
-        });
-      }, 60000);
+      setIsRefreshing(false);
+      toast({
+        title: "Success",
+        description: "Prices refreshed successfully",
+      });
 
     } catch (error) {
       toast({
@@ -232,7 +230,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
               variant="ghost"
               size="icon"
               onClick={handleRefreshPrices}
-              disabled={isRefreshing || !shoppingList}
+              disabled={isRefreshing || !shoppingList || !shoppingList.categoryGroups.some(g => g.items.length > 0)}
             >
               <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>

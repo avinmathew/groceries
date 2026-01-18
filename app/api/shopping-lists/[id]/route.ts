@@ -12,10 +12,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
             category: true,
             productLinks: true,
           },
-          orderBy: [
-            { category: { order: "asc" } },
-            { createdAt: "asc" },
-          ],
         },
       },
     });
@@ -24,7 +20,63 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Shopping list not found" }, { status: 404 });
     }
 
-    return NextResponse.json(shoppingList);
+    // Get all categories with their order
+    const categories = await prisma.category.findMany({
+      orderBy: { order: "asc" },
+    });
+
+    // Separate items into completed and not completed
+    const activeItems = shoppingList.items.filter((item) => !item.isCompleted);
+    const completedItems = shoppingList.items
+      .filter((item) => item.isCompleted)
+      .sort((a, b) => {
+        const aTime = a.completedAt?.getTime() ?? 0;
+        const bTime = b.completedAt?.getTime() ?? 0;
+        return bTime - aTime; // Most recent first
+      });
+
+    // Group active items by category
+    const itemsByCategory = new Map<string, typeof activeItems>();
+    const uncategorizedItems: typeof activeItems = [];
+
+    for (const item of activeItems) {
+      if (item.categoryId) {
+        const categoryId = item.categoryId;
+        if (!itemsByCategory.has(categoryId)) {
+          itemsByCategory.set(categoryId, []);
+        }
+        itemsByCategory.get(categoryId)!.push(item);
+      } else {
+        uncategorizedItems.push(item);
+      }
+    }
+
+    // Sort categories and create category groups
+    const categoryGroups = categories
+      .map((category) => ({
+        category: {
+          id: category.id,
+          name: category.name,
+          order: category.order,
+        },
+        items: itemsByCategory.get(category.id) || [],
+      }))
+      .filter((group) => group.items.length > 0);
+
+    // Add uncategorized at the end
+    if (uncategorizedItems.length > 0) {
+      categoryGroups.push({
+        category: { id: "uncategorized", name: "Uncategorised", order: 999999 },
+        items: uncategorizedItems,
+      });
+    }
+
+    return NextResponse.json({
+      id: shoppingList.id,
+      name: shoppingList.name,
+      categoryGroups,
+      completedItems,
+    });
   } catch (error) {
     console.error("Error fetching shopping list:", error);
     return NextResponse.json({ error: "Failed to fetch shopping list" }, { status: 500 });

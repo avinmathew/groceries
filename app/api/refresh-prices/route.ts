@@ -4,11 +4,14 @@ import { scrapePrice, shouldRefreshPrice } from "@/lib/price-scraper";
 
 export async function POST(request: Request) {
   try {
-    const { groceryItemId } = await request.json();
+    const { groceryItemId, groceryItemIds } = await request.json();
 
     if (groceryItemId) {
       // Refresh prices for a single grocery item
       return await refreshGroceryItemPrices(groceryItemId);
+    } else if (groceryItemIds && Array.isArray(groceryItemIds) && groceryItemIds.length > 0) {
+      // Refresh prices for multiple grocery items
+      return await refreshMultipleGroceryItems(groceryItemIds);
     } else {
       // Refresh prices for all grocery items
       return await refreshAllPrices();
@@ -84,6 +87,99 @@ async function refreshGroceryItemPrices(groceryItemId: string) {
       // Continue with other links even if one fails
     }
   }
+
+  return NextResponse.json({ success: true, updatedLinks });
+}
+
+async function refreshMultipleGroceryItems(groceryItemIds: string[]) {
+  // Calculate the last Wednesday (same logic as shouldRefreshPrice)
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0 = Sunday, 3 = Wednesday
+  const daysSinceWednesday = (dayOfWeek - 3 + 7) % 7;
+  const lastWednesday = new Date(now);
+  lastWednesday.setDate(now.getDate() - daysSinceWednesday);
+  lastWednesday.setHours(0, 0, 0, 0); // Set to start of day
+
+  // Get all product links for the specified grocery items that need refresh
+  const allLinks = await prisma.productLink.findMany({
+    where: {
+      groceryItemId: { in: groceryItemIds },
+      OR: [
+        { lastRefreshed: null },
+        {
+          lastRefreshed: {
+            lt: lastWednesday,
+          },
+        },
+      ],
+    },
+  });
+
+  // Group links by store
+  const linksByStore = new Map<string, typeof allLinks>();
+  allLinks.forEach(link => {
+    const store = link.store;
+    if (!linksByStore.has(store)) {
+      linksByStore.set(store, []);
+    }
+    linksByStore.get(store)!.push(link);
+  });
+
+  const updatedLinks: any[] = [];
+
+  // Process stores in parallel, but links within each store sequentially
+  await Promise.all(
+    Array.from(linksByStore.entries()).map(async ([store, links]) => {
+      console.log(`Processing ${links.length} links for ${store}`);
+      
+      for (const link of links) {
+        try {
+          console.log(`Scraping ${link.store} price from ${link.url}`);
+          const priceData = await scrapePrice(link.url, link.store as any);
+          console.log(`Scraped price data:`, priceData);
+
+          if (priceData.regularPrice !== null || priceData.discountPrice !== null) {
+            // Check if price has changed
+            const priceChanged = 
+              link.regularPrice !== priceData.regularPrice || 
+              link.discountPrice !== priceData.discountPrice;
+
+            const shouldSaveHistory = priceChanged || link.regularPrice === null;
+
+            // Update the product link
+            const updatedLink = await prisma.productLink.update({
+              where: { id: link.id },
+              data: {
+                regularPrice: priceData.regularPrice,
+                discountPrice: priceData.discountPrice,
+                lastRefreshed: new Date(),
+              },
+            });
+
+            // Create price history record if price changed or if this is the first price
+            if (shouldSaveHistory) {
+              await prisma.priceHistory.create({
+                data: {
+                  productLinkId: link.id,
+                  regularPrice: priceData.regularPrice,
+                  discountPrice: priceData.discountPrice,
+                  recordedAt: new Date(),
+                },
+              });
+            }
+
+            console.log(`Updated link ${link.id} with prices: regularPrice=${priceData.regularPrice}, discountPrice=${priceData.discountPrice}`);
+            updatedLinks.push(updatedLink);
+          } else {
+            console.log(`Warning: No price data scraped for ${link.url}`);
+          }
+        } catch (error) {
+          console.error(`Error refreshing price for link ${link.id}:`, error);
+          // Continue with other links even if one fails
+        }
+      }
+    })
+  );
 
   return NextResponse.json({ success: true, updatedLinks });
 }
