@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { ShoppingListView } from "@/components/shopping-list-view";
+import { ShoppingListTracker } from "@/components/shopping-list-tracker";
 
 async function getShoppingList(id: string) {
   const shoppingList = await prisma.shoppingList.findUnique({
@@ -106,5 +107,10 @@ export default async function ShoppingListPage({ params }: { params: { id: strin
     notFound();
   }
 
-  return <ShoppingListView shoppingList={shoppingList} />;
+  return (
+    <>
+      <ShoppingListTracker listId={shoppingList.id} />
+      <ShoppingListView shoppingList={shoppingList} />
+    </>
+  );
 }

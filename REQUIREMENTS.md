@@ -8,8 +8,11 @@ This is a web app that will run on a Digital Ocean droplet.
 Regresion tests should be written for each feature.
 
 ## Home view
+The home view is the last shopping list visited, other the Shopping Lists view.
 
-The home view shows a link to the shopping list. Multiple shopping lists can be created, and the number of items in the shopping list is shown as a badge on the list. 
+## Shopping Lists view
+
+The shoppings lists view shows all shoppings lists. Multiple shopping lists can be created, and the number of items in the shopping list is shown as a badge on the list. 
 On the right of each shopping list is an info icon that will bring up the shopping list edit view.
 
 ### Header
