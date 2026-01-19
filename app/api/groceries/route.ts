@@ -1,16 +1,88 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { decayScore } from "@/lib/frequency";
 
 export async function GET() {
   try {
-    // Get unique grocery names from all grocery items
-    const groceries = await prisma.groceryItem.findMany({
+    const now = new Date();
+
+    // Load usage scores and apply decay on read
+    const usageRows = await prisma.groceryUsage.findMany();
+    const usageMap = new Map<string, number>();
+
+    const decayWrites = usageRows.map(async (usage) => {
+      const decayed = decayScore(usage.score, usage.lastDecayedAt, now);
+      usageMap.set(usage.name, decayed);
+
+      if (decayed !== usage.score) {
+        await prisma.groceryUsage.update({
+          where: { id: usage.id },
+          data: { score: decayed, lastDecayedAt: now },
+        });
+      }
+    });
+
+    await Promise.all(decayWrites);
+
+    // Pull the minimal fields we need once, then aggregate in memory
+    const groceryItems = await prisma.groceryItem.findMany({
       select: {
         name: true,
+        quantity: true,
         categoryId: true,
+        isCompleted: true,
+        shoppingList: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
-      distinct: ["name"],
     });
+
+    type GroceryAggregate = {
+      name: string;
+      categoryId: string | null;
+      shoppingLists: Map<string, { id: string; name: string }>;
+    };
+
+    const groceryMap = new Map<string, GroceryAggregate>();
+
+    for (const item of groceryItems) {
+      const current: GroceryAggregate = groceryMap.get(item.name) ?? {
+        name: item.name,
+        categoryId: null,
+        shoppingLists: new Map<string, { id: string; name: string }>(),
+      };
+
+      // Keep the first known category to aid future auto-assignment if needed
+      if (!current.categoryId && item.categoryId) {
+        current.categoryId = item.categoryId;
+      }
+
+      // Track lists where the item is currently active (not completed)
+      if (!item.isCompleted) {
+        current.shoppingLists.set(item.shoppingList.id, {
+          id: item.shoppingList.id,
+          name: item.shoppingList.name,
+        });
+      }
+
+      groceryMap.set(item.name, current);
+    }
+
+    const groceries = Array.from(groceryMap.values())
+      .map((entry) => ({
+        name: entry.name,
+        categoryId: entry.categoryId,
+        shoppingLists: Array.from(entry.shoppingLists.values()),
+      }))
+      .sort((a, b) => {
+        const scoreA = usageMap.get(a.name) ?? 0;
+        const scoreB = usageMap.get(b.name) ?? 0;
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        return a.name.localeCompare(b.name);
+      });
 
     return NextResponse.json(groceries);
   } catch (error) {

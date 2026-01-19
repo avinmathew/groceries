@@ -47,6 +47,12 @@ Under the "Add an item...", there is a "Crossed off" category header, which is a
 Clicking on a grocery in the main list, will move it to the Crossed Off section. Clicking on a grocery in the Crossed Off section will move it to the Main List.
 The crossed off groceries are ordered by last crossed off being at the top.
 
+### Add item dialog
+Add item dialog shows all items, ordered by most added.
+The text box allows a user to create a new item or filter existing items.
+If the item is already on a shopping list, it is shown underneath in grey text, similar to the Notes on the grocery item row with the text "On [Shopping List]".
+The dialog can be full screen on a mobile display.
+
 ## Info/Edit view
 
 In the info/edit view, the user can rename the grocery.

@@ -19,14 +19,16 @@ import { BASE_PATH } from "@/lib/utils";
 type Grocery = {
   name: string;
   categoryId: string | null;
+  shoppingLists: { id: string; name: string }[];
 };
 
 type AddGroceryDialogProps = {
   shoppingListId: string;
   variant?: "default" | "link";
+  onItemAdded?: () => void;
 };
 
-export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGroceryDialogProps) {
+export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAdded }: AddGroceryDialogProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [groceries, setGroceries] = useState<Grocery[]>([]);
@@ -41,7 +43,14 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
-          setGroceries(data);
+          const normalized = data.map((item) => ({
+            name: item.name,
+            categoryId: item.categoryId ?? null,
+            shoppingLists: Array.isArray(item.shoppingLists) ? item.shoppingLists : [],
+          }));
+
+          setGroceries(normalized);
+          setFilteredGroceries(normalized);
         }
       })
       .catch(() => {
@@ -50,14 +59,17 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
   }, []);
 
   useEffect(() => {
-    if (searchQuery.trim()) {
-      const filtered = groceries.filter((g) =>
-        g.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredGroceries(filtered);
-    } else {
-      setFilteredGroceries([]);
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      setFilteredGroceries(groceries);
+      return;
     }
+
+    const filtered = groceries.filter((g) =>
+      g.name.toLowerCase().includes(query)
+    );
+    setFilteredGroceries(filtered);
   }, [searchQuery, groceries]);
 
   const handleSelectGrocery = async (groceryName: string) => {
@@ -77,6 +89,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
       setOpen(false);
       setSearchQuery("");
       router.refresh();
+      onItemAdded?.();
       toast({
         title: "Success",
         description: "Item added to shopping list",
@@ -100,7 +113,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
   const dialogContent = (
     <>
       <DialogHeader>
-        <DialogTitle>Add an item...</DialogTitle>
+        <DialogTitle>Add an item</DialogTitle>
         <DialogDescription>Type to search for existing items or create a new one.</DialogDescription>
       </DialogHeader>
       <div className="py-4">
@@ -115,19 +128,22 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
             }
           }}
         />
-        <div className="mt-2 max-h-60 overflow-y-auto">
+        <div className="mt-2 max-h-[60vh] overflow-y-auto space-y-1">
           {filteredGroceries.length > 0 ? (
-            <div className="space-y-1">
-              {filteredGroceries.map((grocery, index) => (
-                <button
-                  key={`${grocery.name}-${index}`}
-                  onClick={() => handleSelectGrocery(grocery.name)}
-                  className="w-full text-left px-3 py-2 rounded hover:bg-accent"
-                >
-                  {grocery.name}
-                </button>
-              ))}
-            </div>
+            filteredGroceries.map((grocery, index) => (
+              <button
+                key={`${grocery.name}-${index}`}
+                onClick={() => handleSelectGrocery(grocery.name)}
+                className="w-full text-left px-3 py-2 rounded hover:bg-accent"
+              >
+                <span className="font-medium">{grocery.name}</span>
+                {grocery.shoppingLists.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    On {grocery.shoppingLists.map((list) => list.name).join(", ")}
+                  </p>
+                )}
+              </button>
+            ))
           ) : searchQuery.trim() ? (
             <button
               onClick={handleCreateNew}
@@ -136,7 +152,9 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
             >
               Create &quot;{searchQuery}&quot;
             </button>
-          ) : null}
+          ) : (
+            <p className="text-sm text-muted-foreground px-3 py-2">No items yet. Start typing to add one.</p>
+          )}
         </div>
       </div>
     </>
@@ -150,7 +168,9 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
             Add an item...
           </button>
         </DialogTrigger>
-        <DialogContent>{dialogContent}</DialogContent>
+        <DialogContent className="sm:max-w-lg w-[calc(100vw-1rem)] max-h-[calc(100vh-2rem)] sm:max-h-[80vh] sm:rounded-lg rounded-none">
+          {dialogContent}
+        </DialogContent>
       </Dialog>
     );
   }
@@ -162,7 +182,9 @@ export function AddGroceryDialog({ shoppingListId, variant = "default" }: AddGro
           <Plus className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent>{dialogContent}</DialogContent>
+      <DialogContent className="sm:max-w-lg w-[calc(100vw-1rem)] max-h-[calc(100vh-2rem)] sm:max-h-[80vh] sm:rounded-lg rounded-none">
+        {dialogContent}
+      </DialogContent>
     </Dialog>
   );
 }

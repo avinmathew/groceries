@@ -56,6 +56,18 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   const [shoppingList, setShoppingList] = useState(initialShoppingList);
   const { toast } = useToast();
 
+  const handleItemAdded = async () => {
+    try {
+      const response = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
+      if (response.ok) {
+        const updatedList = await response.json();
+        setShoppingList(updatedList);
+      }
+    } catch (error) {
+      console.error("Failed to refresh shopping list after item added:", error);
+    }
+  };
+
   const handleRefreshPrices = async () => {
     setIsRefreshing(true);
     try {
@@ -234,7 +246,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
             >
               <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
-            {shoppingList && <AddGroceryDialog shoppingListId={shoppingList.id} />}
+            {shoppingList && <AddGroceryDialog shoppingListId={shoppingList.id} onItemAdded={handleItemAdded} />}
             <Button
               variant={isEditMode ? "default" : "ghost"}
               size="icon"
@@ -284,7 +296,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
 
             {/* Add Item Section */}
             <div className="pt-4">
-              <AddGroceryDialog shoppingListId={shoppingList.id} variant="link" />
+              <AddGroceryDialog shoppingListId={shoppingList.id} variant="link" onItemAdded={handleItemAdded} />
             </div>
 
             {/* Crossed Off Section */}

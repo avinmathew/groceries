@@ -1,21 +1,47 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { decayScore } from "@/lib/frequency";
 
 export async function POST(request: Request) {
   try {
     const { name, shoppingListId, categoryId, quantity = 1 } = await request.json();
 
-    if (!name || !shoppingListId) {
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+
+    if (!trimmedName || !shoppingListId) {
       return NextResponse.json(
         { error: "Name and shoppingListId are required" },
         { status: 400 }
       );
     }
 
+    const now = new Date();
+
+    // Track frequency of adds with decay
+    const usage = await prisma.groceryUsage.findUnique({ where: { name: trimmedName } });
+    if (usage) {
+      const decayedScore = decayScore(usage.score, usage.lastDecayedAt, now);
+      await prisma.groceryUsage.update({
+        where: { name: trimmedName },
+        data: {
+          score: decayedScore + 1,
+          lastDecayedAt: now,
+        },
+      });
+    } else {
+      await prisma.groceryUsage.create({
+        data: {
+          name: trimmedName,
+          score: 1,
+          lastDecayedAt: now,
+        },
+      });
+    }
+
     // Check if an item with the same name already exists in this shopping list
     const existingItem = await prisma.groceryItem.findFirst({
       where: {
-        name: name.trim(),
+        name: trimmedName,
         shoppingListId,
         isCompleted: false, // Only check active (not completed) items
       },
@@ -39,7 +65,7 @@ export async function POST(request: Request) {
       // If item doesn't exist, create a new one
       groceryItem = await prisma.groceryItem.create({
         data: {
-          name: name.trim(),
+          name: trimmedName,
           shoppingListId,
           categoryId: categoryId || null,
           quantity,

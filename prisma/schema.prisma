@@ -52,6 +52,17 @@ model GroceryItem {
   @@map("grocery_items")
 }
 
+model GroceryUsage {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  score         Float    @default(0)
+  lastDecayedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("grocery_usage")
+}
+
 model ProductLink {
   id            String   @id @default(cuid())
   url           String
