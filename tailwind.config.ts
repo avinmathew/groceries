@@ -50,6 +50,12 @@ const config: Config = {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        // Brand colors
+        brand: {
+          DEFAULT: "#99C556", // Lime green
+          dark: "#599245",    // Dark green
+        },
+        discount: "#ffda00", // Yellow highlight for discounted prices
       },
       borderRadius: {
         lg: "var(--radius)",

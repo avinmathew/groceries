@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { successResponse, validationError, serverError, getErrorMessage } from "@/lib/api-utils";
 
 export async function GET() {
   try {
@@ -16,10 +17,9 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json(shoppingLists);
+    return successResponse(shoppingLists);
   } catch (error) {
-    console.error("Error fetching shopping lists:", error);
-    return NextResponse.json({ error: "Failed to fetch shopping lists" }, { status: 500 });
+    return serverError("Failed to fetch shopping lists", getErrorMessage(error));
   }
 }
 
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const { name } = await request.json();
 
     if (!name || typeof name !== "string") {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+      return validationError("Name is required");
     }
 
     const shoppingList = await prisma.shoppingList.create({
@@ -37,9 +37,8 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(shoppingList);
+    return successResponse(shoppingList, "Shopping list created successfully", 201);
   } catch (error) {
-    console.error("Error creating shopping list:", error);
-    return NextResponse.json({ error: "Failed to create shopping list" }, { status: 500 });
+    return serverError("Failed to create shopping list", getErrorMessage(error));
   }
 }

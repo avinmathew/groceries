@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { BASE_PATH } from "@/lib/utils";
-import { updateShoppingList } from "@/app/actions/shopping-lists";
 
 type ShoppingList = {
   id: string;
@@ -43,11 +42,13 @@ export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingL
 
     setIsSaving(true);
     try {
-      const result = await updateShoppingList(shoppingList.id, name.trim());
+      const response = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
 
-      if (!result.success) {
-        throw new Error(result.error || "Failed to update shopping list");
-      }
+      if (!response.ok) throw new Error("Failed to update shopping list");
 
       toast({
         title: "Success",

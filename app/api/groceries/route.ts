@@ -1,28 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { decayScore } from "@/lib/frequency";
+import { batchDecayUpdate } from "@/lib/frequency";
 
 export async function GET() {
   try {
     const now = new Date();
 
     // Load usage scores and apply decay on read
-    const usageRows = await prisma.groceryUsage.findMany();
-    const usageMap = new Map<string, number>();
-
-    const decayWrites = usageRows.map(async (usage) => {
-      const decayed = decayScore(usage.score, usage.lastDecayedAt, now);
-      usageMap.set(usage.name, decayed);
-
-      if (decayed !== usage.score) {
-        await prisma.groceryUsage.update({
-          where: { id: usage.id },
-          data: { score: decayed, lastDecayedAt: now },
-        });
-      }
-    });
-
-    await Promise.all(decayWrites);
+    const usageMap = await batchDecayUpdate(now);
 
     // Pull the minimal fields we need once, then aggregate in memory
     const groceryItems = await prisma.groceryItem.findMany({

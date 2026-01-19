@@ -178,7 +178,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="icon" className="bg-[#99C556] hover:bg-[#599245] text-white">
+        <Button size="icon" className="bg-brand hover:bg-brand-dark text-white">
           <Plus className="h-5 w-5" />
         </Button>
       </DialogTrigger>

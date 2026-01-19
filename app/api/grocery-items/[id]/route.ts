@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { successResponse, notFoundError, serverError, getErrorMessage } from "@/lib/api-utils";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -13,13 +14,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
     });
 
     if (!groceryItem) {
-      return NextResponse.json({ error: "Grocery item not found" }, { status: 404 });
+      return notFoundError("Grocery item");
     }
 
-    return NextResponse.json(groceryItem);
+    return successResponse(groceryItem);
   } catch (error) {
-    console.error("Error fetching grocery item:", error);
-    return NextResponse.json({ error: "Failed to fetch grocery item" }, { status: 500 });
+    return serverError("Failed to fetch grocery item", getErrorMessage(error));
   }
 }
 
@@ -46,10 +46,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       },
     });
 
-    return NextResponse.json(groceryItem);
+    return successResponse(groceryItem, "Grocery item updated successfully");
   } catch (error) {
-    console.error("Error updating grocery item:", error);
-    return NextResponse.json({ error: "Failed to update grocery item" }, { status: 500 });
+    return serverError("Failed to update grocery item", getErrorMessage(error));
   }
 }
 
@@ -59,9 +58,8 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       where: { id: params.id },
     });
 
-    return NextResponse.json({ success: true });
+    return successResponse({ deleted: true }, "Grocery item deleted successfully");
   } catch (error) {
-    console.error("Error deleting grocery item:", error);
-    return NextResponse.json({ error: "Failed to delete grocery item" }, { status: 500 });
+    return serverError("Failed to delete grocery item", getErrorMessage(error));
   }
 }

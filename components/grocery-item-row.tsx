@@ -106,7 +106,7 @@ export function GroceryItemRow({
           className="object-contain"
         />
         {hasDiscount ? (
-          <Badge style={{ backgroundColor: '#ffda00', color: 'black', fontSize: '1rem', padding: '0.2rem 0.375rem' }}>
+          <Badge className="bg-discount text-black" style={{ fontSize: '1rem', padding: '0.2rem 0.375rem' }}>
             ${price.toFixed(2)}
           </Badge>
         ) : (

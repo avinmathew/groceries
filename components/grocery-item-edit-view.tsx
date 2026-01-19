@@ -297,41 +297,46 @@ export function GroceryItemEditView({
   const handleRefreshPrices = async () => {
     setIsRefreshing(true);
     try {
-      // Start the refresh process
+      // Start the refresh process in the background
       const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ groceryItemId: initialItem.id }),
       });
 
-      if (!response.ok) throw new Error("Failed to refresh prices");
+      if (!response.ok) throw new Error("Failed to start price refresh");
 
-      // Poll for updates every 2 seconds during refresh
-      const pollInterval = setInterval(async () => {
-        try {
-          const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}`);
-          if (updatedItemResponse.ok) {
-            const updatedItem = await updatedItemResponse.json();
-            setProductLinks(updatedItem.productLinks || []);
-          }
-        } catch (error) {
-          console.error("Error polling for updates:", error);
+      // Poll for updates every 3 seconds for up to 2 minutes
+      const pollInterval = 3000; // 3 seconds
+      const maxDuration = 120000; // 2 minutes
+      const startTime = Date.now();
+      
+      const pollForUpdates = async () => {
+        const elapsed = Date.now() - startTime;
+        
+        // Fetch updated data
+        const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}`);
+        if (updatedItemResponse.ok) {
+          const updatedItem = await updatedItemResponse.json();
+          setProductLinks(updatedItem.productLinks || []);
+          await loadPriceHistory();
         }
-      }, 2000);
 
-      // Stop polling after 60 seconds (assuming refresh won't take longer)
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        setIsRefreshing(false);
-        // Reload price history once at the end
-        loadPriceHistory();
-        toast({
-          title: "Success",
-          description: "Prices refreshed successfully",
-        });
-        router.refresh();
-      }, 60000);
+        // Continue polling if we haven't exceeded max duration
+        if (elapsed < maxDuration && isRefreshing) {
+          setTimeout(pollForUpdates, pollInterval);
+        } else {
+          setIsRefreshing(false);
+          toast({
+            title: "Success",
+            description: "Price refresh complete",
+          });
+          router.refresh();
+        }
+      };
 
+      // Start polling after initial delay
+      setTimeout(pollForUpdates, pollInterval);
     } catch (error) {
       toast({
         title: "Error",
@@ -465,7 +470,7 @@ export function GroceryItemEditView({
                       <span className="font-medium capitalize">{link.store}</span>
                       {link.discountPrice ? (
                         <>
-                          <Badge style={{ backgroundColor: '#ffda00', color: 'black' }}>
+                          <Badge className="bg-discount text-black">
                             ${link.discountPrice.toFixed(2)}
                           </Badge>
                           <span className="text-sm text-muted-foreground line-through">

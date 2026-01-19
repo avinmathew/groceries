@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { decayScore } from "@/lib/frequency";
+import { incrementUsage } from "@/lib/frequency";
+import { successResponse, validationError, serverError, getErrorMessage } from "@/lib/api-utils";
 
 export async function POST(request: Request) {
   try {
@@ -9,34 +10,13 @@ export async function POST(request: Request) {
     const trimmedName = typeof name === "string" ? name.trim() : "";
 
     if (!trimmedName || !shoppingListId) {
-      return NextResponse.json(
-        { error: "Name and shoppingListId are required" },
-        { status: 400 }
-      );
+      return validationError("Name and shoppingListId are required");
     }
 
     const now = new Date();
 
-    // Track frequency of adds with decay
-    const usage = await prisma.groceryUsage.findUnique({ where: { name: trimmedName } });
-    if (usage) {
-      const decayedScore = decayScore(usage.score, usage.lastDecayedAt, now);
-      await prisma.groceryUsage.update({
-        where: { name: trimmedName },
-        data: {
-          score: decayedScore + 1,
-          lastDecayedAt: now,
-        },
-      });
-    } else {
-      await prisma.groceryUsage.create({
-        data: {
-          name: trimmedName,
-          score: 1,
-          lastDecayedAt: now,
-        },
-      });
-    }
+    // Track frequency of adds with decay (centralized logic)
+    await incrementUsage(trimmedName, 1, now);
 
     // Check if an item with the same name already exists in this shopping list
     const existingItem = await prisma.groceryItem.findFirst({
@@ -77,9 +57,8 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json(groceryItem);
+    return successResponse(groceryItem, "Grocery item created successfully", 201);
   } catch (error) {
-    console.error("Error creating grocery item:", error);
-    return NextResponse.json({ error: "Failed to create grocery item" }, { status: 500 });
+    return serverError("Failed to create grocery item", getErrorMessage(error));
   }
 }

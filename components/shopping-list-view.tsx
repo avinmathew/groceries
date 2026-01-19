@@ -268,7 +268,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
             {/* Category Groups */}
             {shoppingList.categoryGroups.map((group) => (
               <div key={group.category.id}>
-                <div className="sticky top-[56px] z-5 bg-[#99C556] px-2 py-1">
+                <div className="sticky top-[56px] z-5 bg-brand px-2 py-1">
                   <h2 className="text-sm text-white font-semibold">{group.category.name}</h2>
                 </div>
                 <div className="space-y-1">
@@ -302,7 +302,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
             {/* Crossed Off Section */}
             {shoppingList.completedItems.length > 0 && (
               <div className="pt-6">
-                <div className="sticky top-[56px] z-5 bg-[#599245] px-2 py-1">
+                <div className="sticky top-[56px] z-5 bg-brand-dark px-2 py-1">
                   <h2 className="text-sm text-white font-semibold">Crossed off</h2>
                 </div>
                 <div className="space-y-1">

@@ -47,12 +47,12 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` and add your SQLite database path:
+Edit `.env` and configure your database:
 ```
 DATABASE_URL="file:./dev.db"
 ```
 
-The database file will be created automatically in the `prisma` directory.
+**Important**: Never commit `.env` or `*.db` files to version control. These contain sensitive data and should remain local only.
 
 4. Set up the database:
 ```bash
