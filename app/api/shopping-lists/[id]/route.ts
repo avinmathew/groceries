@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
@@ -93,10 +92,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         ...(name && { name }),
       },
     });
-
-    // Revalidate the shopping lists page to show updated data
-    revalidatePath("/shopping-lists");
-    revalidatePath(`/shopping-lists/${params.id}`);
 
     return NextResponse.json(shoppingList);
   } catch (error) {
