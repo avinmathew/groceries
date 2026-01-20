@@ -41,11 +41,13 @@ export function CreateShoppingListDialog() {
       const data = await response.json();
       setOpen(false);
       setName("");
-      router.refresh();
       toast({
         title: "Success",
         description: "Shopping list created successfully",
       });
+      // Hard refresh to ensure we see the new data in production
+      router.replace("/shopping-lists");
+      router.refresh();
     } catch (error) {
       toast({
         title: "Error",

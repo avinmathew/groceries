@@ -20,6 +20,8 @@ async function getShoppingLists() {
   });
 }
 
+export const revalidate = 0;
+
 export default async function ShoppingListsPage() {
   const shoppingLists = await getShoppingLists();
 

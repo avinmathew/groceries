@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { successResponse, validationError, serverError, getErrorMessage } from "@/lib/api-utils";
 
@@ -36,6 +37,8 @@ export async function POST(request: Request) {
         name,
       },
     });
+
+    revalidatePath("/shopping-lists");
 
     return successResponse(shoppingList, "Shopping list created successfully", 201);
   } catch (error) {
