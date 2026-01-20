@@ -50,6 +50,7 @@ type PriceHistoryEntry = {
 
 type GroceryItem = {
   id: string;
+  groceryItemId: string;
   name: string;
   quantity: number;
   notes: string | null;
@@ -60,6 +61,7 @@ type GroceryItem = {
     id: string;
     name: string;
   };
+  shoppingListCount?: number;
 };
 
 function CombinedPriceHistoryTable({ priceHistory }: { priceHistory: PriceHistoryEntry[] }) {
@@ -350,7 +352,7 @@ export function GroceryItemEditView({
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const response = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}`, {
+      const response = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.groceryItemId}?scope=all`, {
         method: "DELETE",
       });
 
@@ -568,7 +570,13 @@ export function GroceryItemEditView({
           <DialogHeader>
             <DialogTitle>Delete Grocery Item</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &quot;{initialItem.name}&quot;? This action cannot be undone.
+              Are you sure you want to delete &quot;{initialItem.name}&quot;?
+              {initialItem.shoppingListCount !== undefined && initialItem.shoppingListCount > 1 && (
+                <span className="block mt-2 mb-2 font-semibold">
+                  This item is on {initialItem.shoppingListCount} shopping lists.
+                </span>
+              )}
+              {" "}This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

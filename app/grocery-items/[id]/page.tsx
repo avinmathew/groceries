@@ -3,11 +3,16 @@ import { prisma } from "@/lib/db";
 import { GroceryItemEditView } from "@/components/grocery-item-edit-view";
 
 async function getGroceryItem(id: string) {
-  const item = await prisma.groceryItem.findUnique({
+  const item = await prisma.shoppingListItem.findUnique({
     where: { id },
     include: {
-      category: true,
-      productLinks: true,
+      groceryItem: {
+        include: {
+          category: true,
+          productLinks: true,
+          shoppingListItems: true,
+        },
+      },
       shoppingList: true,
     },
   });
@@ -20,26 +25,33 @@ async function getGroceryItem(id: string) {
 
   // Serialize dates for client-side consumption
   const serializedItem = {
-    ...item,
+    id: item.id,
+    groceryItemId: item.groceryItemId,
+    name: item.groceryItem.name,
+    quantity: item.quantity,
+    notes: item.notes,
+    isCompleted: item.isCompleted,
+    completedAt: item.completedAt?.toISOString() || null,
+    categoryId: item.groceryItem.categoryId,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
-    completedAt: item.completedAt?.toISOString() || null,
-    category: item.category ? {
-      ...item.category,
-      createdAt: item.category.createdAt.toISOString(),
-      updatedAt: item.category.updatedAt.toISOString(),
+    category: item.groceryItem.category ? {
+      ...item.groceryItem.category,
+      createdAt: item.groceryItem.category.createdAt.toISOString(),
+      updatedAt: item.groceryItem.category.updatedAt.toISOString(),
     } : null,
     shoppingList: {
       ...item.shoppingList,
       createdAt: item.shoppingList.createdAt.toISOString(),
       updatedAt: item.shoppingList.updatedAt.toISOString(),
     },
-    productLinks: item.productLinks.map(link => ({
+    productLinks: item.groceryItem.productLinks.map(link => ({
       ...link,
       createdAt: link.createdAt.toISOString(),
       updatedAt: link.updatedAt.toISOString(),
       lastRefreshed: link.lastRefreshed?.toISOString() || null,
     })),
+    shoppingListCount: item.groceryItem.shoppingListItems.length,
   };
 
   return {

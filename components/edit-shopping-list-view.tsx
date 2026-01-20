@@ -20,7 +20,7 @@ import { BASE_PATH } from "@/lib/utils";
 type ShoppingList = {
   id: string;
   name: string;
-  items: Array<{ id: string }>;
+  items: Array<{ id: string; isCompleted?: boolean }>;
 };
 
 export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingList }) {
@@ -142,7 +142,13 @@ export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingL
           <DialogHeader>
             <DialogTitle>Delete Shopping List</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this shopping list{shoppingList.items.length > 0 ? ` with ${shoppingList.items.length} item${shoppingList.items.length === 1 ? '' : 's'}` : ''}? This action cannot be undone.
+              Are you sure you want to delete this shopping list?
+              {shoppingList.items.filter(item => item.isCompleted !== true).length > 0 && (
+                <span className="block mt-2 mb-2 font-semibold">
+                  This shopping list has {shoppingList.items.filter(item => item.isCompleted !== true).length} active items.
+                </span>
+              )}
+              {" "}This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

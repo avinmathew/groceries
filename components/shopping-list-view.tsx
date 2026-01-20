@@ -18,12 +18,14 @@ type ShoppingList = {
     category: { id: string; name: string; order: number };
     items: Array<{
       id: string;
+      groceryItemId: string;
       name: string;
       quantity: number;
       notes: string | null;
       isCompleted: boolean;
       categoryId: string | null;
       category: { id: string; name: string; order: number };
+      shoppingListCount?: number;
       productLinks: Array<{
         id: string;
         store: string;
@@ -34,12 +36,14 @@ type ShoppingList = {
   }>;
   completedItems: Array<{
     id: string;
+    groceryItemId: string;
     name: string;
     quantity: number;
     notes: string | null;
     isCompleted: boolean;
     categoryId: string | null;
     category: { id: string; name: string; order: number };
+    shoppingListCount?: number;
     productLinks: Array<{
       id: string;
       store: string;
@@ -204,6 +208,26 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     }
   };
 
+  const handleItemDeleted = (itemId: string) => {
+    // Remove item from local state
+    setShoppingList(prev => {
+      const updatedGroups = prev.categoryGroups
+        .map(group => ({
+          ...group,
+          items: group.items.filter(item => item.id !== itemId)
+        }))
+        .filter(group => group.items.length > 0);
+
+      const updatedCompletedItems = prev.completedItems.filter(item => item.id !== itemId);
+
+      return {
+        ...prev,
+        categoryGroups: updatedGroups,
+        completedItems: updatedCompletedItems,
+      };
+    });
+  };
+
   // Calculate total price for all active (non-completed) items using the lowest price per item
   const totalPrice = useMemo(() => {
     if (!shoppingList?.categoryGroups) return null;
@@ -278,6 +302,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
                       item={item}
                       isEditMode={isEditMode}
                       onToggleComplete={() => handleToggleComplete(item.id, item.isCompleted)}
+                      onItemDeleted={handleItemDeleted}
                     />
                   ))}
                 </div>
@@ -312,6 +337,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
                       item={item}
                       isEditMode={isEditMode}
                       onToggleComplete={() => handleToggleComplete(item.id, item.isCompleted)}
+                      onItemDeleted={handleItemDeleted}
                     />
                   ))}
                 </div>

@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { BASE_PATH } from "@/lib/utils";
 
 type Grocery = {
+  id?: string;
   name: string;
   categoryId: string | null;
   shoppingLists: { id: string; name: string }[];

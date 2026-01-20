@@ -12,20 +12,25 @@ export async function GET() {
     // Pull the minimal fields we need once, then aggregate in memory
     const groceryItems = await prisma.groceryItem.findMany({
       select: {
+        id: true,
         name: true,
-        quantity: true,
         categoryId: true,
-        isCompleted: true,
-        shoppingList: {
+        shoppingListItems: {
           select: {
-            id: true,
-            name: true,
+            isCompleted: true,
+            shoppingList: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },
     });
 
     type GroceryAggregate = {
+      id: string;
       name: string;
       categoryId: string | null;
       shoppingLists: Map<string, { id: string; name: string }>;
@@ -35,22 +40,21 @@ export async function GET() {
 
     for (const item of groceryItems) {
       const current: GroceryAggregate = groceryMap.get(item.name) ?? {
+        id: item.id,
         name: item.name,
-        categoryId: null,
+        categoryId: item.categoryId,
         shoppingLists: new Map<string, { id: string; name: string }>(),
       };
 
-      // Keep the first known category to aid future auto-assignment if needed
-      if (!current.categoryId && item.categoryId) {
-        current.categoryId = item.categoryId;
-      }
 
       // Track lists where the item is currently active (not completed)
-      if (!item.isCompleted) {
-        current.shoppingLists.set(item.shoppingList.id, {
-          id: item.shoppingList.id,
-          name: item.shoppingList.name,
-        });
+      for (const sli of item.shoppingListItems) {
+        if (!sli.isCompleted) {
+          current.shoppingLists.set(sli.shoppingList.id, {
+            id: sli.shoppingList.id,
+            name: sli.shoppingList.name,
+          });
+        }
       }
 
       groceryMap.set(item.name, current);
@@ -58,6 +62,7 @@ export async function GET() {
 
     const groceries = Array.from(groceryMap.values())
       .map((entry) => ({
+        id: entry.id,
         name: entry.name,
         categoryId: entry.categoryId,
         shoppingLists: Array.from(entry.shoppingLists.values()),

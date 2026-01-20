@@ -35,12 +35,14 @@ On the right of each grocery is an info icon that will bring up an edit view.
 Notes are shown in small grey text under the grocery item name.
 The grocery item shows the lowest price for Woolworths, Coles and Aldi (in that order). Show the icon, and then the price. The lowest price for the grocery item can be highlighted. The price is multiplied by the quantity. Align this to the right.
 The total using the lowest price per store should be shown at the bottom of the list, above the "Add an item..."
+A grocery item can be added to multiple shopping lists.
 
 ### Header
 In a non-scrolling header:
 There is a Refresh Prices icon button. See Refresh Prices section for what it does.
 Also in the header is a Add Grocery icon button, which will do the same as "Add an item...".
 There is also an Edit button, which will show each grocery item with a delete icon and a grab control to reorder within a category or re-assign to another category.
+Deleting an item will prompt a dialog that shows if the grocery item is referenced on other shopping lists. Deleting the grocery item deletes it from all shopping lists.
 
 ### Crossed off section
 Under the "Add an item...", there is a "Crossed off" category header, which is all previously groceries marked as "done". These groceries have a strikethrough font.

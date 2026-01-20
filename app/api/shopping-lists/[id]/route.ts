@@ -8,8 +8,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
       include: {
         items: {
           include: {
-            category: true,
-            productLinks: true,
+            groceryItem: {
+              include: {
+                category: true,
+                productLinks: true,
+                shoppingListItems: true,
+              },
+            },
           },
         },
       },
@@ -39,8 +44,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const uncategorizedItems: typeof activeItems = [];
 
     for (const item of activeItems) {
-      if (item.categoryId) {
-        const categoryId = item.categoryId;
+      if (item.groceryItem.categoryId) {
+        const categoryId = item.groceryItem.categoryId;
         if (!itemsByCategory.has(categoryId)) {
           itemsByCategory.set(categoryId, []);
         }
@@ -58,23 +63,72 @@ export async function GET(request: Request, { params }: { params: { id: string }
           name: category.name,
           order: category.order,
         },
-        items: itemsByCategory.get(category.id) || [],
+        items: (itemsByCategory.get(category.id) || []).map(sli => ({
+          id: sli.id,
+          groceryItemId: sli.groceryItemId,
+          name: sli.groceryItem.name,
+          quantity: sli.quantity,
+          notes: sli.notes,
+          isCompleted: sli.isCompleted,
+          categoryId: sli.groceryItem.categoryId,
+          category: category,
+          productLinks: sli.groceryItem.productLinks,
+          shoppingListCount: sli.groceryItem.shoppingListItems.length,
+        })),
       }))
       .filter((group) => group.items.length > 0);
 
     // Add uncategorized at the end
     if (uncategorizedItems.length > 0) {
+      const uncategorizedCategory = { 
+        id: "uncategorized", 
+        name: "Uncategorised", 
+        order: 999999,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
       categoryGroups.push({
-        category: { id: "uncategorized", name: "Uncategorised", order: 999999 },
-        items: uncategorizedItems,
+        category: uncategorizedCategory,
+        items: uncategorizedItems.map(sli => ({
+          id: sli.id,
+          groceryItemId: sli.groceryItemId,
+          name: sli.groceryItem.name,
+          quantity: sli.quantity,
+          notes: sli.notes,
+          isCompleted: sli.isCompleted,
+          categoryId: sli.groceryItem.categoryId,
+          category: uncategorizedCategory,
+          productLinks: sli.groceryItem.productLinks,
+          shoppingListCount: sli.groceryItem.shoppingListItems.length,
+        })),
       });
     }
+
+    const formattedCompletedItems = completedItems.map(sli => ({
+      id: sli.id,
+      groceryItemId: sli.groceryItemId,
+      name: sli.groceryItem.name,
+      quantity: sli.quantity,
+      notes: sli.notes,
+      isCompleted: sli.isCompleted,
+      categoryId: sli.groceryItem.categoryId,
+      category: sli.groceryItem.category || { 
+        id: "uncategorized", 
+        name: "Uncategorised", 
+        order: 999999,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      productLinks: sli.groceryItem.productLinks,
+      completedAt: sli.completedAt,
+      shoppingListCount: sli.groceryItem.shoppingListItems.length,
+    }));
 
     return NextResponse.json({
       id: shoppingList.id,
       name: shoppingList.name,
       categoryGroups,
-      completedItems,
+      completedItems: formattedCompletedItems,
     });
   } catch (error) {
     console.error("Error fetching shopping list:", error);

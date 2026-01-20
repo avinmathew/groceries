@@ -1,20 +1,31 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Info, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { BASE_PATH } from "@/lib/utils";
 
 type GroceryItem = {
   id: string;
+  groceryItemId: string;
   name: string;
   quantity: number;
   notes: string | null;
   isCompleted: boolean;
+  shoppingListCount?: number;
   productLinks: Array<{
     id: string;
     store: string;
@@ -27,19 +38,27 @@ export function GroceryItemRow({
   item,
   isEditMode,
   onToggleComplete,
+  onItemDeleted,
 }: {
   item: GroceryItem;
   isEditMode: boolean;
   onToggleComplete: () => void;
+  onItemDeleted?: (itemId: string) => void;
 }) {
   const { toast } = useToast();
   const router = useRouter();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const shoppingListCount = item.shoppingListCount ?? null;
+
+  const handleDeleteClick = () => {
+    setShowDeleteDialog(true);
+  };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this item?")) return;
-
+    setIsDeleting(true);
     try {
-      const response = await fetch(`${BASE_PATH}/api/grocery-items/${item.id}`, {
+      const response = await fetch(`${BASE_PATH}/api/grocery-items/${item.groceryItemId}?scope=all`, {
         method: "DELETE",
       });
 
@@ -49,13 +68,22 @@ export function GroceryItemRow({
         title: "Success",
         description: "Item deleted successfully",
       });
-      router.refresh();
+      
+      // Call the callback to remove item from UI immediately
+      if (onItemDeleted) {
+        onItemDeleted(item.id);
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to delete item",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -141,7 +169,7 @@ export function GroceryItemRow({
         <PriceDisplay store="aldi" price={aldiPrice} />
       </div>
       {isEditMode ? (
-        <Button variant="ghost" size="icon" onClick={handleDelete}>
+        <Button variant="ghost" size="icon" onClick={handleDeleteClick}>
           <Trash2 className="h-4 w-4 text-destructive" />
         </Button>
       ) : (
@@ -151,6 +179,31 @@ export function GroceryItemRow({
           </Button>
         </Link>
       )}
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Item</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{item.name}&quot;?
+              {shoppingListCount !== null && shoppingListCount > 1 && (
+                <span className="block mt-2 font-semibold">
+                  This item is on {shoppingListCount} shopping lists.
+                </span>
+              )}
+              {" "}This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

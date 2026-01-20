@@ -16,7 +16,7 @@ model ShoppingList {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items GroceryItem[]
+  items ShoppingListItem[]
 
   @@map("shopping_lists")
 }
@@ -28,7 +28,7 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items GroceryItem[]
+  groceryItems GroceryItem[]
 
   @@map("categories")
 }
@@ -36,20 +36,33 @@ model Category {
 model GroceryItem {
   id            String   @id @default(cuid())
   name          String
+  categoryId    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category         Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  productLinks     ProductLink[]
+  shoppingListItems ShoppingListItem[]
+
+  @@map("grocery_items")
+}
+
+model ShoppingListItem {
+  id            String   @id @default(cuid())
   quantity      Int      @default(1)
   notes         String?
   isCompleted   Boolean  @default(false)
   completedAt   DateTime?
-  categoryId    String?
+  groceryItemId String
   shoppingListId String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  shoppingList  ShoppingList   @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
-  productLinks  ProductLink[]
+  groceryItem  GroceryItem  @relation(fields: [groceryItemId], references: [id], onDelete: Cascade)
+  shoppingList ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
 
-  @@map("grocery_items")
+  @@unique([groceryItemId, shoppingListId])
+  @@map("shopping_list_items")
 }
 
 model GroceryUsage {

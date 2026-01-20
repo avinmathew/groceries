@@ -18,47 +18,71 @@ export async function POST(request: Request) {
     // Track frequency of adds with decay (centralized logic)
     await incrementUsage(trimmedName, 1, now);
 
-    // Check if an item with the same name already exists in this shopping list
-    const existingItem = await prisma.groceryItem.findFirst({
+    // Find or create the GroceryItem (the product catalog entry)
+    let groceryItem = await prisma.groceryItem.findFirst({
       where: {
         name: trimmedName,
+      },
+    });
+
+    if (!groceryItem) {
+      // Create a new grocery item if it doesn't exist
+      groceryItem = await prisma.groceryItem.create({
+        data: {
+          name: trimmedName,
+          categoryId: categoryId || null,
+        },
+      });
+    }
+
+    // Check if this item is already on this shopping list
+    const existingShoppingListItem = await prisma.shoppingListItem.findFirst({
+      where: {
+        groceryItemId: groceryItem.id,
         shoppingListId,
         isCompleted: false, // Only check active (not completed) items
       },
     });
 
-    let groceryItem;
+    let shoppingListItem;
 
-    if (existingItem) {
-      // If item exists, increment its quantity
-      groceryItem = await prisma.groceryItem.update({
-        where: { id: existingItem.id },
+    if (existingShoppingListItem) {
+      // If item exists on this list, increment its quantity
+      shoppingListItem = await prisma.shoppingListItem.update({
+        where: { id: existingShoppingListItem.id },
         data: {
-          quantity: existingItem.quantity + 1,
+          quantity: existingShoppingListItem.quantity + 1,
         },
         include: {
-          category: true,
-          productLinks: true,
+          groceryItem: {
+            include: {
+              category: true,
+              productLinks: true,
+            },
+          },
         },
       });
     } else {
-      // If item doesn't exist, create a new one
-      groceryItem = await prisma.groceryItem.create({
+      // Create a new shopping list item
+      shoppingListItem = await prisma.shoppingListItem.create({
         data: {
-          name: trimmedName,
+          groceryItemId: groceryItem.id,
           shoppingListId,
-          categoryId: categoryId || null,
           quantity,
         },
         include: {
-          category: true,
-          productLinks: true,
+          groceryItem: {
+            include: {
+              category: true,
+              productLinks: true,
+            },
+          },
         },
       });
     }
 
-    return successResponse(groceryItem, "Grocery item created successfully", 201);
+    return successResponse(shoppingListItem, "Item added to shopping list successfully", 201);
   } catch (error) {
-    return serverError("Failed to create grocery item", getErrorMessage(error));
+    return serverError("Failed to add item to shopping list", getErrorMessage(error));
   }
 }

@@ -9,8 +9,13 @@ async function getShoppingList(id: string) {
     include: {
       items: {
         include: {
-          category: true,
-          productLinks: true,
+          groceryItem: {
+            include: {
+              category: true,
+              productLinks: true,
+              shoppingListItems: true,
+            },
+          },
         },
       },
     },
@@ -38,8 +43,8 @@ async function getShoppingList(id: string) {
   const uncategorizedItems: typeof activeItems = [];
 
   for (const item of activeItems) {
-    if (item.categoryId) {
-      const categoryId = item.categoryId;
+    if (item.groceryItem.categoryId) {
+      const categoryId = item.groceryItem.categoryId;
       if (!itemsByCategory.has(categoryId)) {
         itemsByCategory.set(categoryId, []);
       }
@@ -57,23 +62,52 @@ async function getShoppingList(id: string) {
         name: category.name,
         order: category.order,
       },
-      items: itemsByCategory.get(category.id) || [],
+      items: (itemsByCategory.get(category.id) || []).map(sli => ({
+        id: sli.id,
+        groceryItemId: sli.groceryItemId,
+        name: sli.groceryItem.name,
+        quantity: sli.quantity,
+        notes: sli.notes,
+        isCompleted: sli.isCompleted,
+        categoryId: sli.groceryItem.categoryId,
+        category: category,
+        productLinks: sli.groceryItem.productLinks,
+        shoppingListCount: sli.groceryItem.shoppingListItems.length,
+      })),
     }))
     .filter((group) => group.items.length > 0);
 
   // Add uncategorized at the end
   if (uncategorizedItems.length > 0) {
+    const uncategorizedCategory = { 
+      id: "uncategorized", 
+      name: "Uncategorised", 
+      order: 999999,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
     categoryGroups.push({
-      category: { id: "uncategorized", name: "Uncategorised", order: 999999 },
-      items: uncategorizedItems,
+      category: uncategorizedCategory,
+      items: uncategorizedItems.map(sli => ({
+        id: sli.id,
+        groceryItemId: sli.groceryItemId,
+        name: sli.groceryItem.name,
+        quantity: sli.quantity,
+        notes: sli.notes,
+        isCompleted: sli.isCompleted,
+        categoryId: sli.groceryItem.categoryId,
+        category: uncategorizedCategory,
+        productLinks: sli.groceryItem.productLinks,
+        shoppingListCount: sli.groceryItem.shoppingListItems.length,
+      })),
     });
   }
 
   // Serialize dates for client-side consumption
   const serializeItem = (item: any) => ({
     ...item,
-    createdAt: item.createdAt.toISOString(),
-    updatedAt: item.updatedAt.toISOString(),
+    createdAt: item.createdAt?.toISOString() || new Date().toISOString(),
+    updatedAt: item.updatedAt?.toISOString() || new Date().toISOString(),
     completedAt: item.completedAt?.toISOString() || null,
     productLinks: item.productLinks.map((link: any) => ({
       id: link.id,
@@ -88,7 +122,29 @@ async function getShoppingList(id: string) {
     items: group.items.map(serializeItem),
   }));
 
-  const serializedCompletedItems = completedItems.map(serializeItem);
+  const serializedCompletedItems = completedItems.map(sli => 
+    serializeItem({
+      id: sli.id,
+      groceryItemId: sli.groceryItemId,
+      name: sli.groceryItem.name,
+      quantity: sli.quantity,
+      notes: sli.notes,
+      isCompleted: sli.isCompleted,
+      categoryId: sli.groceryItem.categoryId,
+      category: sli.groceryItem.category || { 
+        id: "uncategorized", 
+        name: "Uncategorised", 
+        order: 999999,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      productLinks: sli.groceryItem.productLinks,
+      completedAt: sli.completedAt,
+      createdAt: sli.createdAt,
+      updatedAt: sli.updatedAt,
+      shoppingListCount: sli.groceryItem.shoppingListItems.length,
+    })
+  );
 
   return {
     id: shoppingList.id,
