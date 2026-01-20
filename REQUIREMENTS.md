@@ -22,7 +22,7 @@ A header in the home view shows icons to :
 
 ## Shopping List edit view
 Users can change the name of the shopping list.
-There is a button to delete this shopping list, with a prompt.
+There is a button to delete this shopping list, with a prompt. If there are items on a shopping list, when trying to delete it, the number of items should be show in the confirmation dialog box.
 Clicking Save will bring the user back to the Home view.
 
 ## Shopping List view

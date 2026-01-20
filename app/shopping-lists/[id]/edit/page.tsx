@@ -5,6 +5,9 @@ import { EditShoppingListView } from "@/components/edit-shopping-list-view";
 async function getShoppingList(id: string) {
   return await prisma.shoppingList.findUnique({
     where: { id },
+    include: {
+      items: true,
+    },
   });
 }
 
