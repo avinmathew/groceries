@@ -21,6 +21,7 @@ async function getShoppingLists() {
 }
 
 export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 export default async function ShoppingListsPage() {
   const shoppingLists = await getShoppingLists();

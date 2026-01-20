@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, RefreshCw, Plus, Edit, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +60,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [shoppingList, setShoppingList] = useState(initialShoppingList);
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleItemAdded = async () => {
     try {
@@ -251,15 +253,18 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     return total > 0 ? total : null;
   }, [shoppingList]);
 
+  const handleBackClick = () => {
+    router.push('/shopping-lists');
+    router.refresh();
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b bg-background">
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
-          <Link href="/shopping-lists">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="icon" onClick={handleBackClick}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <h1 className="text-xl font-semibold">{shoppingList?.name || "Loading..."}</h1>
           <div className="flex items-center gap-2">
             <Button

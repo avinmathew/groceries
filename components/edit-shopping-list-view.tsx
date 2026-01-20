@@ -142,10 +142,10 @@ export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingL
           <DialogHeader>
             <DialogTitle>Delete Shopping List</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this shopping list?
+              Are you sure you want to delete the shopping list &quot;{shoppingList.name}&quot;?
               {shoppingList.items.filter(item => item.isCompleted !== true).length > 0 && (
                 <span className="block mt-2 mb-2 font-semibold">
-                  This shopping list has {shoppingList.items.filter(item => item.isCompleted !== true).length} active items.
+                  It has {shoppingList.items.filter(item => item.isCompleted !== true).length} active item{shoppingList.items.filter(item => item.isCompleted !== true).length !== 1 ? "s" : ""}.
                 </span>
               )}
               {" "}This action cannot be undone.
