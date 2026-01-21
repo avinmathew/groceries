@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, RefreshCw } from "lucide-react";
@@ -177,6 +177,7 @@ export function GroceryItemEditView({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [priceHistory, setPriceHistory] = useState<PriceHistoryEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -200,13 +201,17 @@ export function GroceryItemEditView({
     loadPriceHistory();
   }, [loadPriceHistory]);
 
-  const handleSave = async () => {
-    if (!name.trim()) {
-      toast({
-        title: "Error",
-        description: "Name cannot be empty",
-        variant: "destructive",
-      });
+  const saveField = useCallback(async (fieldData?: Partial<{name: string; quantity: number; notes: string; categoryId: string}>) => {
+    // Prepare the data to save
+    const dataToSave = fieldData || {
+      name: name.trim(),
+      quantity,
+      notes: notes.trim() || null,
+      categoryId: categoryId === "uncategorised" ? null : categoryId,
+    };
+
+    // Don't save if name is empty
+    if (!dataToSave.name || !dataToSave.name.trim()) {
       return;
     }
 
@@ -216,31 +221,27 @@ export function GroceryItemEditView({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
-          quantity,
-          notes: notes.trim() || null,
-          categoryId: categoryId === "uncategorised" ? null : categoryId,
+          name: dataToSave.name.trim(),
+          quantity: dataToSave.quantity,
+          notes: dataToSave.notes || null,
+          categoryId: dataToSave.categoryId === "uncategorised" ? null : dataToSave.categoryId,
         }),
       });
 
       if (!response.ok) throw new Error("Failed to update grocery item");
-
-      toast({
-        title: "Success",
-        description: "Grocery item updated successfully",
-      });
-      router.push(`/shopping-lists/${initialItem.shoppingList.id}`);
+      
+      // Refresh the router to revalidate data
       router.refresh();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update grocery item",
+        description: "Failed to save changes",
         variant: "destructive",
       });
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [initialItem.id, toast, router]);
 
   const handleAddLink = async () => {
     if (!newLinkUrl.trim()) return;
@@ -397,7 +398,12 @@ export function GroceryItemEditView({
         <div className="space-y-6">
           <div>
             <label className="text-sm font-medium mb-2 block">Name</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Item name" />
+            <Input 
+              value={name} 
+              onChange={(e) => setName(e.target.value)} 
+              onBlur={() => saveField({name, quantity, notes, categoryId})}
+              placeholder="Item name" 
+            />
           </div>
 
           <div>
@@ -405,13 +411,21 @@ export function GroceryItemEditView({
             <div className="flex items-center gap-4">
               <Button
                 variant="outline"
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                onClick={() => {
+                  const newQty = Math.max(1, quantity - 1);
+                  setQuantity(newQty);
+                  saveField({name, quantity: newQty, notes, categoryId});
+                }}
                 disabled={quantity <= 1}
               >
                 Less
               </Button>
               <span className="text-lg font-medium">{quantity}</span>
-              <Button variant="outline" onClick={() => setQuantity(quantity + 1)}>
+              <Button variant="outline" onClick={() => {
+                const newQty = quantity + 1;
+                setQuantity(newQty);
+                saveField({name, quantity: newQty, notes, categoryId});
+              }}>
                 More
               </Button>
             </div>
@@ -424,7 +438,10 @@ export function GroceryItemEditView({
 
           <div>
             <label className="text-sm font-medium mb-2 block">Category</label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
+            <Select value={categoryId} onValueChange={(newCategoryId) => {
+              setCategoryId(newCategoryId);
+              saveField({name, quantity, notes, categoryId: newCategoryId});
+            }}>
               <SelectTrigger>
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
@@ -444,6 +461,7 @@ export function GroceryItemEditView({
             <Input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => saveField({name, quantity, notes, categoryId})}
               placeholder="Add notes"
               maxLength={500}
             />
@@ -542,19 +560,16 @@ export function GroceryItemEditView({
             <Button
               variant="destructive"
               onClick={() => setShowDeleteDialog(true)}
-              disabled={isSaving}
+              disabled={isDeleting}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => router.back()}>
-                Cancel
+            <Link href={`/shopping-lists/${initialItem.shoppingList.id}`}>
+              <Button variant="outline">
+                Back
               </Button>
-              <Button onClick={handleSave} disabled={isSaving || !name.trim()}>
-                {isSaving ? "Saving..." : "Save"}
-              </Button>
-            </div>
+            </Link>
           </div>
 
           {priceHistory.length > 0 && (

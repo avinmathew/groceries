@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
@@ -28,16 +28,12 @@ export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingL
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleSave = async () => {
+  const saveField = async () => {
     if (!name.trim()) {
-      toast({
-        title: "Error",
-        description: "Name cannot be empty",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -50,17 +46,13 @@ export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingL
       });
 
       if (!response.ok) throw new Error("Failed to update shopping list");
-
-      toast({
-        title: "Success",
-        description: "Shopping list updated successfully",
-      });
-      router.push("/shopping-lists");
+      
+      // Refresh the router to revalidate data
       router.refresh();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update shopping list",
+        description: "Failed to save changes",
         variant: "destructive",
       });
     } finally {
@@ -116,23 +108,21 @@ export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingL
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onBlur={saveField}
               placeholder="Shopping list name"
             />
           </div>
 
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={() => router.back()}>
-              Cancel
+          <div className="flex justify-between pt-4 border-t">
+            <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
             </Button>
-            <div className="flex gap-2">
-              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
+            <Link href="/shopping-lists">
+              <Button variant="outline">
+                Back
               </Button>
-              <Button onClick={handleSave} disabled={isSaving || !name.trim()}>
-                Save
-              </Button>
-            </div>
+            </Link>
           </div>
         </div>
       </main>
