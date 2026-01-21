@@ -35,23 +35,24 @@ export async function POST(request: Request) {
       });
     }
 
-    // Check if this item is already on this shopping list
+    // Check if this item is already on this shopping list (regardless of completion)
     const existingShoppingListItem = await prisma.shoppingListItem.findFirst({
       where: {
         groceryItemId: groceryItem.id,
         shoppingListId,
-        isCompleted: false, // Only check active (not completed) items
       },
     });
 
     let shoppingListItem;
 
     if (existingShoppingListItem) {
-      // If item exists on this list, increment its quantity
+      // If item exists on this list, revive if completed and increment quantity by requested amount
       shoppingListItem = await prisma.shoppingListItem.update({
         where: { id: existingShoppingListItem.id },
         data: {
-          quantity: existingShoppingListItem.quantity + 1,
+          isCompleted: false,
+          completedAt: null,
+          quantity: (existingShoppingListItem.quantity ?? 0) + (quantity ?? 1),
         },
         include: {
           groceryItem: {

@@ -25,3 +25,8 @@ jest.mock('next/server', () => ({
     }
   },
 }));
+
+// Mock Next.js cache utilities used in routes
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+}));

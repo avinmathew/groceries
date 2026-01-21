@@ -171,11 +171,26 @@ describe('GET /api/shopping-lists/[id]', () => {
       id: '1',
       name: 'Test List',
       items: [
-        { id: 'item1', name: 'apple', categoryId: 'cat1', isCompleted: false },
+        {
+          id: 'item1',
+          groceryItemId: 'g1',
+          quantity: 1,
+          notes: '',
+          isCompleted: false,
+          completedAt: null,
+          groceryItem: {
+            id: 'g1',
+            name: 'apple',
+            categoryId: 'cat1',
+            category: { id: 'cat1', name: 'Fruits', order: 1 },
+            productLinks: [],
+            shoppingListItems: [],
+          },
+        },
       ],
       createdAt: new Date(),
       updatedAt: new Date(),
-    };
+    } as any;
 
     const mockCategories = [
       { id: 'cat1', name: 'Fruits', order: 1 },

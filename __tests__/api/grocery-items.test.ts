@@ -19,6 +19,13 @@ jest.mock('@/lib/db', () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
+    shoppingListItem: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
     groceryUsage: {
       findFirst: jest.fn(),
       create: jest.fn(),
@@ -39,20 +46,31 @@ describe('POST /api/grocery-items', () => {
     jest.clearAllMocks();
   });
 
-  it('should create a new grocery item with valid data', async () => {
-    const mockItem = {
-      id: '1',
+  it('should add item to shopping list with valid data', async () => {
+    const mockGrocery = {
+      id: 'g1',
       name: 'Test Item',
-      shoppingListId: 'list1',
-      quantity: 1,
       category: null,
       productLinks: [],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
+    const mockShoppingListItem = {
+      id: 'sli1',
+      quantity: 1,
+      isCompleted: false,
+      shoppingListId: 'list1',
+      groceryItemId: 'g1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      groceryItem: mockGrocery,
+    } as any;
+
     mockPrisma.groceryItem.findFirst.mockResolvedValue(null);
-    mockPrisma.groceryItem.create.mockResolvedValue(mockItem);
+    mockPrisma.groceryItem.create.mockResolvedValue(mockGrocery as any);
+    mockPrisma.shoppingListItem.findFirst.mockResolvedValue(null);
+    mockPrisma.shoppingListItem.create.mockResolvedValue(mockShoppingListItem as any);
 
     const request = new NextRequest('http://localhost:3000/api/grocery-items', {
       method: 'POST',
@@ -63,7 +81,7 @@ describe('POST /api/grocery-items', () => {
     const data = await response.json();
 
     expect(response.status).toBe(201);
-    expect(data.data).toEqual(mockItem);
+    expect(data.data).toEqual(mockShoppingListItem);
   });
 
   it('should return validation error for missing name', async () => {
@@ -89,7 +107,7 @@ describe('POST /api/grocery-items', () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toContain('Failed to create grocery item');
+    expect(data.error).toContain('Failed to add item to shopping list');
   });
 
   it('should handle database errors gracefully', async () => {
@@ -105,7 +123,7 @@ describe('POST /api/grocery-items', () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toContain('Failed to create grocery item');
+    expect(data.error).toContain('Failed to add item to shopping list');
   });
 });
 
@@ -124,6 +142,7 @@ describe('GET /api/grocery-items/[id]', () => {
       productLinks: [],
     };
 
+    mockPrisma.shoppingListItem.findUnique.mockResolvedValue(null as any);
     mockPrisma.groceryItem.findUnique.mockResolvedValue(mockItem);
 
     const request = new NextRequest('http://localhost:3000/api/grocery-items/1');
@@ -134,7 +153,7 @@ describe('GET /api/grocery-items/[id]', () => {
     expect(data.data).toEqual(mockItem);
     expect(mockPrisma.groceryItem.findUnique).toHaveBeenCalledWith({
       where: { id: '1' },
-      include: { category: true, productLinks: true, shoppingList: true },
+      include: { category: true, productLinks: true, shoppingListItems: true },
     });
   });
 
@@ -164,6 +183,7 @@ describe('PATCH /api/grocery-items/[id]', () => {
       updatedAt: new Date(),
     };
 
+    mockPrisma.shoppingListItem.update.mockResolvedValue({ id: '1', groceryItemId: '1', quantity: 1, groceryItem: {} } as any);
     mockPrisma.groceryItem.update.mockResolvedValue(mockItem);
 
     const request = new NextRequest('http://localhost:3000/api/grocery-items/1', {
@@ -175,11 +195,11 @@ describe('PATCH /api/grocery-items/[id]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.data).toEqual(mockItem);
+    expect(response.status).toBe(200);
+    expect(data.data).toEqual({ id: '1', groceryItemId: '1', quantity: 1, groceryItem: {} });
     expect(mockPrisma.groceryItem.update).toHaveBeenCalledWith({
       where: { id: '1' },
       data: { name: 'Updated Item' },
-      include: { category: true, productLinks: true },
     });
   });
 
@@ -195,19 +215,13 @@ describe('PATCH /api/grocery-items/[id]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toContain('Failed to update grocery item');
+    expect(data.error).toContain('Failed to update shopping list item');
   });
 
   it('should accept empty name updates', async () => {
-    const mockItem = {
-      id: '1',
-      name: '',
-      category: 'Vegetables',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    mockPrisma.groceryItem.update.mockResolvedValue(mockItem);
+    const updatedSli = { id: '1', groceryItemId: '1', quantity: 1, groceryItem: { name: '' } } as any;
+    mockPrisma.shoppingListItem.update.mockResolvedValue(updatedSli);
+    mockPrisma.groceryItem.update.mockResolvedValue({ id: '1', name: '' } as any);
 
     const request = new NextRequest('http://localhost:3000/api/grocery-items/1', {
       method: 'PATCH',
@@ -218,7 +232,7 @@ describe('PATCH /api/grocery-items/[id]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.data.name).toBe('');
+    expect(data.data.groceryItem.name).toBe('');
   });
 });
 
@@ -229,39 +243,42 @@ describe('DELETE /api/grocery-items/[id]', () => {
 
   it('should delete grocery item with valid id', async () => {
     mockPrisma.groceryItem.delete.mockResolvedValue({} as any);
+    mockPrisma.groceryItem.findUnique.mockResolvedValue({ id: '1' } as any);
 
-    const request = new NextRequest('http://localhost:3000/api/grocery-items/1');
+    const request = new NextRequest('http://localhost:3000/api/grocery-items/1?scope=all');
     const response = await DELETE(request, { params: { id: '1' } });
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.message).toContain('deleted successfully');
+    expect(data.message).toContain('deleted from all lists');
     expect(mockPrisma.groceryItem.delete).toHaveBeenCalledWith({
       where: { id: '1' },
     });
   });
 
   it('should return 500 when deleting non-existent item', async () => {
+    mockPrisma.groceryItem.findUnique.mockResolvedValue({ id: '1' } as any);
     mockPrisma.groceryItem.delete.mockRejectedValue(new Error('Record not found'));
 
-    const request = new NextRequest('http://localhost:3000/api/grocery-items/999');
+    const request = new NextRequest('http://localhost:3000/api/grocery-items/999?scope=all');
     const response = await DELETE(request, { params: { id: '999' } });
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toContain('Failed to delete grocery item');
+    expect(data.error).toContain('Failed to delete shopping list item');
   });
 
   it('should handle cascade delete constraints', async () => {
+    mockPrisma.groceryItem.findUnique.mockResolvedValue({ id: '1' } as any);
     mockPrisma.groceryItem.delete.mockRejectedValue(
       new Error('Foreign key constraint failed')
     );
 
-    const request = new NextRequest('http://localhost:3000/api/grocery-items/1');
+    const request = new NextRequest('http://localhost:3000/api/grocery-items/1?scope=all');
     const response = await DELETE(request, { params: { id: '1' } });
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toContain('Failed to delete grocery item');
+    expect(data.error).toContain('Failed to delete shopping list item');
   });
 });
