@@ -183,7 +183,7 @@ export function GroceryItemEditView({
   const loadPriceHistory = useCallback(async () => {
     setIsLoadingHistory(true);
     try {
-      const response = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}/price-history`);
+      const response = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.groceryItemId}/price-history`);
       if (response.ok) {
         const history = await response.json();
         setPriceHistory(history);
@@ -193,7 +193,7 @@ export function GroceryItemEditView({
     } finally {
       setIsLoadingHistory(false);
     }
-  }, [initialItem.id]);
+  }, [initialItem.groceryItemId]);
 
   // Load price history on mount
   useEffect(() => {
@@ -252,7 +252,7 @@ export function GroceryItemEditView({
         body: JSON.stringify({
           url: newLinkUrl.trim(),
           store: newLinkStore,
-          groceryItemId: initialItem.id,
+          groceryItemId: initialItem.groceryItemId,
         }),
       });
 
@@ -303,7 +303,7 @@ export function GroceryItemEditView({
       const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groceryItemId: initialItem.id }),
+        body: JSON.stringify({ groceryItemId: initialItem.groceryItemId }),
       });
 
       if (!response.ok) throw new Error("Failed to start price refresh");
@@ -317,10 +317,11 @@ export function GroceryItemEditView({
         const elapsed = Date.now() - startTime;
         
         // Fetch updated data
-        const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.id}`);
+        const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.groceryItemId}`);
         if (updatedItemResponse.ok) {
           const updatedItem = await updatedItemResponse.json();
-          setProductLinks(updatedItem.productLinks || []);
+          const refreshedLinks = updatedItem.data?.productLinks ?? updatedItem.productLinks ?? [];
+          setProductLinks(refreshedLinks);
           await loadPriceHistory();
         }
 
