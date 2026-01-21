@@ -85,6 +85,7 @@ There is only one item - Categories, which navigates to the Edit Categories view
 
 A list of Categories is presented.
 At the top in the header, is a Add Category icon button. This prompts for a category name.
-On the left of the category name, users have a delete icon to delete the category. Any grocery items using this category will then be marked as Uncategorised.
-On the right of the category name, is a drag handle that allows reordering of categories.
+Users have a delete icon to delete the category. Any grocery items using this category will then be marked as Uncategorised.
+There is a drag and drop handle on the category that allows reordering of categories.
+Users can edit the category name.
 
