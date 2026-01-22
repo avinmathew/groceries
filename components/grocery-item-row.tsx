@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { BASE_PATH } from "@/lib/utils";
+import { BASE_PATH, isPriceStale } from "@/lib/utils";
 
 type GroceryItem = {
   id: string;
@@ -31,6 +31,7 @@ type GroceryItem = {
     store: string;
     regularPrice: number | null;
     discountPrice: number | null;
+    lastRefreshed: Date | null;
   }>;
 };
 
@@ -124,8 +125,11 @@ export function GroceryItemRow({
     const storeLinks = item.productLinks.filter((link) => link.store.toLowerCase() === storeLower);
     const hasDiscount = storeLinks.some((link) => link.discountPrice !== null);
     
+    // Check if any of the prices for this store are stale
+    const isStale = storeLinks.some((link) => isPriceStale(link.lastRefreshed));
+    
     return (
-      <div className={`flex items-center gap-1 ${isLowest ? "font-semibold text-primary" : ""}`}>
+      <div className={`flex items-center gap-1 ${isLowest && !isStale ? "font-semibold text-primary" : ""} ${isStale ? "opacity-40" : ""}`}>
         <Image
           src={`/store_icons/${storeLower}.webp`}
           alt={store}
@@ -134,11 +138,11 @@ export function GroceryItemRow({
           className="object-contain"
         />
         {hasDiscount ? (
-          <Badge className="bg-discount text-black" style={{ fontSize: '1rem', padding: '0.2rem 0.375rem' }}>
+          <Badge className={`${isStale ? "bg-gray-400 text-white" : "bg-discount text-black"}`} style={{ fontSize: '1rem', padding: '0.2rem 0.375rem' }}>
             ${price.toFixed(2)}
           </Badge>
         ) : (
-          <span className={isLowest ? "text-primary" : ""}>${price.toFixed(2)}</span>
+          <span className={isLowest && !isStale ? "text-primary" : ""}>${price.toFixed(2)}</span>
         )}
       </div>
     );

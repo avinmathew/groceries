@@ -72,7 +72,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
           isCompleted: sli.isCompleted,
           categoryId: sli.groceryItem.categoryId,
           category: category,
-          productLinks: sli.groceryItem.productLinks,
+          productLinks: sli.groceryItem.productLinks.map(pl => ({
+            id: pl.id,
+            store: pl.store,
+            regularPrice: pl.regularPrice,
+            discountPrice: pl.discountPrice,
+            lastRefreshed: pl.lastRefreshed,
+          })),
           shoppingListCount: sli.groceryItem.shoppingListItems.length,
         })),
       }))
@@ -98,7 +104,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
           isCompleted: sli.isCompleted,
           categoryId: sli.groceryItem.categoryId,
           category: uncategorizedCategory,
-          productLinks: sli.groceryItem.productLinks,
+          productLinks: sli.groceryItem.productLinks.map(pl => ({
+            id: pl.id,
+            store: pl.store,
+            regularPrice: pl.regularPrice,
+            discountPrice: pl.discountPrice,
+            lastRefreshed: pl.lastRefreshed,
+          })),
           shoppingListCount: sli.groceryItem.shoppingListItems.length,
         })),
       });
@@ -113,7 +125,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
       isCompleted: sli.isCompleted,
       categoryId: sli.groceryItem.categoryId,
       category: sli.groceryItem.category || { 
-        id: "uncategorized", 
+        id: "uncategorized", .map(pl => ({
+        id: pl.id,
+        store: pl.store,
+        regularPrice: pl.regularPrice,
+        discountPrice: pl.discountPrice,
+        lastRefreshed: pl.lastRefreshed,
+      }))
         name: "Uncategorised", 
         order: 999999,
         createdAt: new Date(),

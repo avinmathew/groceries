@@ -32,6 +32,7 @@ type ShoppingList = {
         store: string;
         regularPrice: number | null;
         discountPrice: number | null;
+        lastRefreshed: Date | null;
       }>;
     }>;
   }>;
@@ -50,6 +51,7 @@ type ShoppingList = {
       store: string;
       regularPrice: number | null;
       discountPrice: number | null;
+      lastRefreshed: Date | null;
     }>;
     completedAt: Date | null;
   }>;
@@ -79,7 +81,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     try {
       // Collect IDs of all active (non-completed) items
       const activeItemIds = shoppingList.categoryGroups
-        .flatMap(group => group.items.map(item => item.id));
+        .flatMap(group => group.items.map(item => item.groceryItemId));
 
       // Start the refresh process - this waits until scraping is complete
       const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {

@@ -114,6 +114,7 @@ async function getShoppingList(id: string) {
       store: link.store,
       regularPrice: link.regularPrice,
       discountPrice: link.discountPrice,
+      lastRefreshed: link.lastRefreshed?.toISOString() || null,
     })),
   });
 

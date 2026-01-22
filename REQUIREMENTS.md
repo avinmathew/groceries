@@ -34,6 +34,7 @@ If a grocery does not have a allocated category, it is added to an "Uncategorise
 On the right of each grocery is an info icon that will bring up an edit view.
 Notes are shown in small grey text under the grocery item name.
 The grocery item shows the lowest price for Woolworths, Coles and Aldi (in that order). Show the icon, and then the price. The lowest price for the grocery item can be highlighted. The price is multiplied by the quantity. Align this to the right.
+Prices are greyed out if they haven't been refreshed since the last Wednesday midnight.
 The total using the lowest price per store should be shown at the bottom of the list, above the "Add an item..."
 A grocery item can be added to multiple shopping lists.
 
