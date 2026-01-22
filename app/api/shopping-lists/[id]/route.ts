@@ -125,19 +125,19 @@ export async function GET(request: Request, { params }: { params: { id: string }
       isCompleted: sli.isCompleted,
       categoryId: sli.groceryItem.categoryId,
       category: sli.groceryItem.category || { 
-        id: "uncategorized", .map(pl => ({
-        id: pl.id,
-        store: pl.store,
-        regularPrice: pl.regularPrice,
-        discountPrice: pl.discountPrice,
-        lastRefreshed: pl.lastRefreshed,
-      }))
+        id: "uncategorized", 
         name: "Uncategorised", 
         order: 999999,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-      productLinks: sli.groceryItem.productLinks,
+      productLinks: sli.groceryItem.productLinks.map(pl => ({
+        id: pl.id,
+        store: pl.store,
+        regularPrice: pl.regularPrice,
+        discountPrice: pl.discountPrice,
+        lastRefreshed: pl.lastRefreshed,
+      })),
       completedAt: sli.completedAt,
       shoppingListCount: sli.groceryItem.shoppingListItems.length,
     }));

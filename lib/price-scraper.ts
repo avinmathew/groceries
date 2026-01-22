@@ -169,10 +169,16 @@ function extractPrice(text: string): number | null {
 }
 
 // Generic price extraction from page using JavaScript
-async function extractPricesFromPage(page: Page, config: StoreConfig): Promise<{ current?: string; was?: string }> {
+async function extractPricesFromPage(page: Page, config: StoreConfig): Promise<{ current?: string; was?: string; outOfStock?: boolean }> {
   try {
     return await page.evaluate((cfg) => {
-      const result: { current?: string; was?: string } = {};
+      const result: { current?: string; was?: string; outOfStock?: boolean } = {};
+      
+      // Check if page indicates out of stock
+      const bodyText = document.body.textContent?.toLowerCase() || '';
+      result.outOfStock = bodyText.includes('out of stock') || 
+                         bodyText.includes('currently unavailable') ||
+                         bodyText.includes('temporarily unavailable');
       
       // Helper to check if text contains a valid price
       const isValidPrice = (text: string, min: number, max: number): boolean => {
@@ -273,6 +279,14 @@ function parseJsonLd($: any): number | null {
         if (jsonLd.offers) {
           const offers = Array.isArray(jsonLd.offers) ? jsonLd.offers : [jsonLd.offers];
           for (const offer of offers) {
+            // Check if out of stock
+            if (offer.availability) {
+              const availability = String(offer.availability).toLowerCase();
+              if (availability.includes('outofstock') || availability.includes('out of stock')) {
+                return null;
+              }
+            }
+            
             if (offer.price !== undefined && offer.price !== null) {
               const price = typeof offer.price === "number" ? offer.price : parseFloat(String(offer.price));
               if (!isNaN(price) && price > 0) return price;
@@ -292,9 +306,19 @@ function parseJsonLd($: any): number | null {
       }
       
       // Direct Offer type
-      if (jsonLd["@type"] === "Offer" && jsonLd.price !== undefined) {
-        const price = typeof jsonLd.price === "number" ? jsonLd.price : parseFloat(String(jsonLd.price));
-        if (!isNaN(price) && price > 0) return price;
+      if (jsonLd["@type"] === "Offer") {
+        // Check if out of stock
+        if (jsonLd.availability) {
+          const availability = String(jsonLd.availability).toLowerCase();
+          if (availability.includes('outofstock') || availability.includes('out of stock')) {
+            return null;
+          }
+        }
+        
+        if (jsonLd.price !== undefined) {
+          const price = typeof jsonLd.price === "number" ? jsonLd.price : parseFloat(String(jsonLd.price));
+          if (!isNaN(price) && price > 0) return price;
+        }
       }
     } catch (e) {
       // Skip invalid JSON-LD
@@ -380,6 +404,11 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
       const html = await page.content();
       await page.close();
 
+      // If item is out of stock, return null prices
+      if (extractedPrices.outOfStock) {
+        return { regularPrice: null, discountPrice: null };
+      }
+
       // Process extracted prices
       if (extractedPrices.current) {
         const currentPrice = extractPrice(extractedPrices.current);
@@ -395,6 +424,19 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
 
       // Fallback to HTML parsing
       const $ = cheerio.load(html);
+      
+      // Check for out of stock in JSON-LD (will return null if out of stock)
+      const jsonLdPrice = parseJsonLd($);
+      if (jsonLdPrice === null) {
+        // Check if null is due to out of stock vs no price data
+        const bodyText = $('body').text().toLowerCase();
+        if (bodyText.includes('out of stock') || 
+            bodyText.includes('currently unavailable') ||
+            bodyText.includes('temporarily unavailable')) {
+          return { regularPrice: null, discountPrice: null };
+        }
+      }
+      
       const result = parseHtmlForPrices($, config);
 
       return result.regularPrice || result.discountPrice ? result : { regularPrice: null, discountPrice: null };
