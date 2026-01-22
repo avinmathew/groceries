@@ -141,15 +141,18 @@ const STORE_CONFIGS: Record<Store, StoreConfig> = {
   aldi: {
     name: "aldi",
     priceSelectors: [
-      'h1',
+      '.base-price__regular',
+      '[class*="base-price"]',
       '[class*="price"]',
       '[class*="Price"]',
       '[data-testid*="price"]',
       '[data-testid*="Price"]',
-      'main',
-      '[role="main"]',
     ],
-    wasSelectors: [],
+    wasSelectors: [
+      '[class*="was-price"]',
+      '[class*="Was"]',
+      '[class*="original-price"]',
+    ],
     priceRange: { min: 0.01, max: 999.99 },
     pricePattern: /\$\s*([\d,]+\.\d{2})/g,
   },
