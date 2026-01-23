@@ -246,8 +246,20 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
         }, config.localStorage);
       }
 
-      await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await page.goto(url, { waitUntil: "networkidle0", timeout: 10000 });
+
+      // Wait for price-related element to appear to ensure client-side pricing finished loading
+      const waitSelector = config.containerSelectors?.[0] || config.priceSelectors[0];
+      if (waitSelector) {
+        try {
+          await page.waitForSelector(waitSelector, { timeout: 10000 });
+        } catch (e) {
+          console.warn(`[Price Scraper] ${store} price selector not found within timeout: ${waitSelector}`);
+        }
+      }
+
+      // Rate limit each store call
+      await new Promise((resolve) => setTimeout(resolve, 5000));
 
       // Extract prices from rendered page
       const extractedPrices = await extractPricesFromPage(page, config);

@@ -147,6 +147,7 @@ async function processLinks(
   const updatedLinks: any[] = [];
 
   // Process stores in parallel, links within each store sequentially
+  // Note: Prices are stored in DB immediately after scraping (not batched at the end)
   await Promise.all(
     Array.from(linksByStore.entries()).map(async ([store, storeLinks]) => {
       for (const link of storeLinks) {
@@ -154,8 +155,12 @@ async function processLinks(
           const priceData = await scrapePrice(link.url, link.store as any);
 
           if (priceData.regularPrice !== null || priceData.discountPrice !== null) {
+            // Immediately persist to database so UI polling can pick it up
             const updated = await updateProductLink(link, priceData);
+            console.log(`Stored price for link ${link.id}: regular=${priceData.regularPrice}, discount=${priceData.discountPrice}`);
             updatedLinks.push(updated);
+          } else {
+            console.log(`No price data extracted for link ${link.id}`);
           }
         } catch (error) {
           console.error(`Error refreshing price for link ${link.id}:`, error);
