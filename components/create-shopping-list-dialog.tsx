@@ -66,7 +66,7 @@ export function CreateShoppingListDialog() {
           <Plus className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="inset-x-0 top-2 translate-x-0 translate-y-0 mx-auto w-[calc(100vw-1rem)] max-h-[calc(100dvh-2rem)] rounded-none sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:max-h-[80vh] sm:rounded-lg">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Create Shopping List</DialogTitle>

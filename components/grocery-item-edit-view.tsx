@@ -400,7 +400,8 @@ export function GroceryItemEditView({
             <label className="text-sm font-medium mb-2 block">Name</label>
             <Input 
               value={name} 
-              onChange={(e) => setName(e.target.value)} 
+              onChange={(e) => setName(e.target.value)}
+              autoCapitalize="none"
               onBlur={() => saveField({name, quantity, notes, categoryId})}
               placeholder="Item name" 
             />

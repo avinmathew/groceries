@@ -123,6 +123,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           autoFocus
+          autoCapitalize="none"
           onKeyDown={(e) => {
             if (e.key === "Enter" && filteredGroceries.length === 0 && searchQuery.trim()) {
               handleCreateNew();
@@ -169,7 +170,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
             Add an item...
           </button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-lg w-[calc(100vw-1rem)] max-h-[calc(100vh-2rem)] sm:max-h-[80vh] sm:rounded-lg rounded-none">
+        <DialogContent className="inset-x-0 top-2 translate-x-0 translate-y-0 mx-auto w-[calc(100vw-1rem)] max-h-[calc(100dvh-2rem)] rounded-none sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:max-h-[80vh] sm:rounded-lg">
           {dialogContent}
         </DialogContent>
       </Dialog>
@@ -183,7 +184,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
           <Plus className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg w-[calc(100vw-1rem)] max-h-[calc(100vh-2rem)] sm:max-h-[80vh] sm:rounded-lg rounded-none">
+      <DialogContent className="inset-x-0 top-2 translate-x-0 translate-y-0 mx-auto w-[calc(100vw-1rem)] max-h-[calc(100dvh-2rem)] rounded-none sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:max-h-[80vh] sm:rounded-lg">
         {dialogContent}
       </DialogContent>
     </Dialog>
