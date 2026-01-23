@@ -21,3 +21,32 @@ export async function GET(
     );
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const entryId = searchParams.get('entryId');
+    
+    if (!entryId) {
+      return NextResponse.json(
+        { error: "Missing entryId parameter" },
+        { status: 400 }
+      );
+    }
+
+    await prisma.priceHistory.delete({
+      where: { id: entryId },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting price history entry:", error);
+    return NextResponse.json(
+      { error: "Failed to delete price history entry" },
+      { status: 500 }
+    );
+  }
+}

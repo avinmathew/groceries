@@ -56,13 +56,14 @@ The text box allows a user to create a new item or filter existing items.
 If the item is already on a shopping list, it is shown underneath in grey text, similar to the Notes on the grocery item row with the text "On [Shopping List]".
 The dialog can be full screen on a mobile display.
 
-## Info/Edit view
+## Edit Grocery view
 
-In the info/edit view, the user can rename the grocery.
+In the edit gorcery view, the user can rename the grocery.
 There are Less and More buttons to indicate the quantity required. If there is only one item, then the grocery name is shown. If there are two or more items, then the grocery name with the number in parantheses is shown, e.g. `apples (2)` for two apples.
 There is a dropdown to select the category.
 There is a single line (no newline) free-text Note textbox.
 There is the ability to add links to product pages from Woolworths, Coles and Aldi. Multiple links for a store can be added. Regular prices and discount prices are shown next to each link. The date of last price refresh is shown next to the price in "days ago".
+Clicking on a price allows the user to delete the price. This is in case there are errors with the scraper. A confirmation dialog should be presented.
 There is a Refresh Prices button that allows all the links for this grocery to be refreshed.
 Clicking Save will bring the user back to the shopping list page.
 There is a button to delete this grocery item, with a prompt.

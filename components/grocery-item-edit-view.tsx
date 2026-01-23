@@ -175,6 +175,8 @@ export function GroceryItemEditView({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDeletePriceDialog, setShowDeletePriceDialog] = useState(false);
+  const [priceToDelete, setPriceToDelete] = useState<{ linkId: string; priceType: 'discount' | 'regular'; store: string } | null>(null);
   const [priceHistory, setPriceHistory] = useState<PriceHistoryEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
@@ -294,6 +296,77 @@ export function GroceryItemEditView({
         description: "Failed to delete product link",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeletePrice = async () => {
+    if (!priceToDelete) return;
+
+    try {
+      const link = productLinks.find(l => l.id === priceToDelete.linkId);
+      if (!link) return;
+
+      // Find the most recent price history entry for this product link that matches the current price
+      const linkHistory = priceHistory
+        .filter(h => h.productLinkId === priceToDelete.linkId)
+        .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime());
+      
+      // Find the most recent entry that matches the price being deleted
+      const currentPriceEntry = linkHistory.find(h => {
+        if (priceToDelete.priceType === 'discount') {
+          return h.discountPrice === link.discountPrice;
+        } else {
+          return h.regularPrice === link.regularPrice && h.discountPrice === null;
+        }
+      });
+
+      // Delete the price history entry if found
+      if (currentPriceEntry) {
+        await fetch(`${BASE_PATH}/api/product-links/${priceToDelete.linkId}/price-history?entryId=${currentPriceEntry.id}`, {
+          method: "DELETE",
+        });
+      }
+
+      // Find the most recent historical entry (excluding the one we're deleting)
+      const mostRecentHistoricalEntry = linkHistory.find(h => {
+        return h.id !== currentPriceEntry?.id;
+      });
+
+      const updateData: { regularPrice?: null; discountPrice?: null; lastRefreshed?: string | null } = {};
+      if (priceToDelete.priceType === 'discount') {
+        updateData.discountPrice = null;
+      } else {
+        updateData.regularPrice = null;
+      }
+      
+      // Update lastRefreshed to the most recent historical entry, or null if none exists
+      updateData.lastRefreshed = mostRecentHistoricalEntry?.recordedAt || null;
+
+      const response = await fetch(`${BASE_PATH}/api/product-links/${priceToDelete.linkId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) throw new Error("Failed to delete price");
+
+      const updatedLink = await response.json();
+      setProductLinks(productLinks.map(l => l.id === updatedLink.id ? updatedLink : l));
+      await loadPriceHistory();
+      
+      toast({
+        title: "Success",
+        description: "Price deleted successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete price",
+        variant: "destructive",
+      });
+    } finally {
+      setShowDeletePriceDialog(false);
+      setPriceToDelete(null);
     }
   };
 
@@ -492,19 +565,43 @@ export function GroceryItemEditView({
                       <span className="font-medium capitalize">{link.store}</span>
                       {link.discountPrice ? (
                         <>
-                          <Badge className="bg-discount text-black">
+                          <Badge 
+                            className="bg-discount text-black cursor-pointer hover:opacity-80"
+                            onClick={() => {
+                              setPriceToDelete({ linkId: link.id, priceType: 'discount', store: link.store });
+                              setShowDeletePriceDialog(true);
+                            }}
+                            title="Click to delete this price"
+                          >
                             ${link.discountPrice.toFixed(2)}
                           </Badge>
-                          <span className="text-sm text-muted-foreground line-through">
+                          <span 
+                            className="text-sm text-muted-foreground line-through cursor-pointer hover:opacity-80"
+                            onClick={() => {
+                              setPriceToDelete({ linkId: link.id, priceType: 'regular', store: link.store });
+                              setShowDeletePriceDialog(true);
+                            }}
+                            title="Click to delete this price"
+                          >
                             ${link.regularPrice?.toFixed(2)}
                           </span>
                         </>
                       ) : link.regularPrice ? (
-                        <Badge variant="secondary">${link.regularPrice.toFixed(2)}</Badge>
+                        <Badge 
+                          variant="secondary" 
+                          className="cursor-pointer hover:opacity-80"
+                          onClick={() => {
+                            setPriceToDelete({ linkId: link.id, priceType: 'regular', store: link.store });
+                            setShowDeletePriceDialog(true);
+                          }}
+                          title="Click to delete this price"
+                        >
+                          ${link.regularPrice.toFixed(2)}
+                        </Badge>
                       ) : (
                         <Badge variant="outline">No price</Badge>
                       )}
-                      {link.lastRefreshed && (
+                      {link.lastRefreshed && (link.regularPrice !== null || link.discountPrice !== null) && (
                         <span className="text-xs text-muted-foreground">
                           {(() => {
                             const daysAgo = Math.floor((Date.now() - new Date(link.lastRefreshed).getTime()) / (1000 * 60 * 60 * 24));
@@ -602,6 +699,28 @@ export function GroceryItemEditView({
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
               {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeletePriceDialog} onOpenChange={setShowDeletePriceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Price</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the {priceToDelete?.priceType} price for {priceToDelete?.store}? This is useful if the scraper recorded an incorrect price.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowDeletePriceDialog(false);
+              setPriceToDelete(null);
+            }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeletePrice}>
+              Delete Price
             </Button>
           </DialogFooter>
         </DialogContent>
