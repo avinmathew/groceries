@@ -219,6 +219,120 @@ async function extractPricesFromPage(page: Page, config: StoreConfig): Promise<{
   }
 }
 
+
+// Parse JSON-LD structured data
+function parseJsonLd($: any): number | null {
+  const jsonLdScripts = $('script[type="application/ld+json"]');
+  
+  for (let i = 0; i < jsonLdScripts.length; i++) {
+    try {
+      const scriptContent = $(jsonLdScripts[i]).html() || "";
+      const jsonLd = JSON.parse(scriptContent);
+      
+      // Product type with offers
+      if (jsonLd["@type"] === "Product") {
+        if (jsonLd.offers) {
+          const offers = Array.isArray(jsonLd.offers) ? jsonLd.offers : [jsonLd.offers];
+          for (const offer of offers) {
+            // Check if out of stock
+            if (offer.availability) {
+              const availability = String(offer.availability).toLowerCase();
+              if (availability.includes('outofstock') || availability.includes('out of stock')) {
+                return null;
+              }
+            }
+            
+            if (offer.price !== undefined && offer.price !== null) {
+              const price = typeof offer.price === "number" ? offer.price : parseFloat(String(offer.price));
+              if (!isNaN(price) && price > 0) return price;
+            }
+            if (offer.priceSpecification?.value !== undefined) {
+              const price = typeof offer.priceSpecification.value === "number" 
+                ? offer.priceSpecification.value 
+                : parseFloat(String(offer.priceSpecification.value));
+              if (!isNaN(price) && price > 0) return price;
+            }
+          }
+        }
+        if (jsonLd.price !== undefined) {
+          const price = typeof jsonLd.price === "number" ? jsonLd.price : parseFloat(String(jsonLd.price));
+          if (!isNaN(price) && price > 0) return price;
+        }
+      }
+      
+      // Direct Offer type
+      if (jsonLd["@type"] === "Offer") {
+        // Check if out of stock
+        if (jsonLd.availability) {
+          const availability = String(jsonLd.availability).toLowerCase();
+          if (availability.includes('outofstock') || availability.includes('out of stock')) {
+            return null;
+          }
+        }
+        
+        if (jsonLd.price !== undefined) {
+          const price = typeof jsonLd.price === "number" ? jsonLd.price : parseFloat(String(jsonLd.price));
+          if (!isNaN(price) && price > 0) return price;
+        }
+      }
+    } catch (e) {
+      // Skip invalid JSON-LD
+    }
+  }
+  
+  return null;
+}
+
+// Parse HTML with Cheerio using selectors
+function parseHtmlForPrices($: any, config: StoreConfig): PriceData {
+  let currentPrice: number | null = null;
+  let wasPrice: number | null = null;
+
+  // Try JSON-LD first (most reliable)
+  currentPrice = parseJsonLd($);
+
+  // Try CSS selectors
+  if (!currentPrice) {
+    for (const selector of config.priceSelectors) {
+      try {
+        const elements = $(selector);
+        for (let i = 0; i < elements.length; i++) {
+          const text = $(elements[i]).text().trim();
+          const price = extractPrice(text);
+          if (price && price >= config.priceRange.min && price <= config.priceRange.max) {
+            currentPrice = price;
+            break;
+          }
+        }
+        if (currentPrice) break;
+      } catch (e) {
+        // Skip invalid selectors
+      }
+    }
+  }
+
+  // Find "was" price
+  for (const selector of config.wasSelectors) {
+    try {
+      const text = $(selector).first().text().trim();
+      const price = extractPrice(text);
+      if (price && price >= config.priceRange.min && price <= config.priceRange.max) {
+        wasPrice = price;
+        break;
+      }
+    } catch (e) {
+      // Skip invalid selectors
+    }
+  }
+
+  // Determine regular vs discount price
+  if (wasPrice && currentPrice && wasPrice > currentPrice) {
+    return { regularPrice: wasPrice, discountPrice: currentPrice };
+  }
+  
+  return { regularPrice: currentPrice, discountPrice: null };
+}
+
 // Main scraping function
 export async function scrapePrice(url: string, store: Store): Promise<PriceData> {
   console.log(`[Price Scraper] Starting scrape for ${store}: ${url}`);
@@ -286,9 +400,28 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
         }
       }
 
-      // If price can't be extracted (e.g. item is out of stock), return null prices
-      console.log(`[Price Scraper] ${store} No valid prices found, returning null prices`);
-      return { regularPrice: null, discountPrice: null };
+
+      // Fallback to HTML parsing
+      console.log(`[Price Scraper] ${store} Falling back to HTML parsing`);
+      const $ = cheerio.load(html);
+      
+      // Check for out of stock in JSON-LD (will return null if out of stock)
+      const jsonLdPrice = parseJsonLd($);
+      console.log(`[Price Scraper] ${store} JSON-LD price check:`, jsonLdPrice);
+      if (jsonLdPrice === null) {
+        // Check if null is due to out of stock vs no price data
+        const bodyText = $('body').text().toLowerCase();
+        if (bodyText.includes('out of stock') || 
+            bodyText.includes('currently unavailable') ||
+            bodyText.includes('temporarily unavailable')) {
+          return { regularPrice: null, discountPrice: null };
+        }
+      }
+      
+      const result = parseHtmlForPrices($, config);
+      console.log(`[Price Scraper] ${store} HTML parsing result:`, result);
+
+      return result.regularPrice || result.discountPrice ? result : { regularPrice: null, discountPrice: null };
     } catch (error) {
       await page.close();
       throw error;
