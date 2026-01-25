@@ -243,7 +243,7 @@ export function GroceryItemEditView({
     } finally {
       setIsSaving(false);
     }
-  }, [initialItem.id, toast, router]);
+  }, [initialItem.id, toast, router, name, quantity, notes, categoryId]);
 
   const handleAddLink = async () => {
     if (!newLinkUrl.trim()) return;
