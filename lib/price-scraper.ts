@@ -44,6 +44,8 @@ async function getBrowser(): Promise<Browser> {
         "--no-first-run",
         "--no-zygote",
         "--disable-gpu",
+        "--disable-blink-features=AutomationControlled", // Hide automation
+        "--disable-features=IsolateOrigins,site-per-process",
       ],
     });
 
@@ -347,9 +349,49 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
     const page = await browser.newPage();
 
     try {
+      // Set realistic viewport and headers to avoid bot detection
+      await page.setViewport({ width: 1920, height: 1080 });
       await page.setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
       );
+      await page.setExtraHTTPHeaders({
+        'Accept-Language': 'en-AU,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+      });
+
+      // Hide automation indicators
+      await page.evaluateOnNewDocument(() => {
+        // Override the navigator.webdriver property
+        Object.defineProperty(navigator, 'webdriver', {
+          get: () => false,
+        });
+
+        // Mock plugins and mimeTypes to look like a real browser
+        Object.defineProperty(navigator, 'plugins', {
+          get: () => [1, 2, 3, 4, 5],
+        });
+
+        // Add chrome object
+        (window as any).chrome = {
+          runtime: {},
+        };
+
+        // Override permissions
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters: any) => (
+          parameters.name === 'notifications' ?
+            Promise.resolve({ state: Notification.permission } as PermissionStatus) :
+            originalQuery(parameters)
+        );
+      });
 
       // Set localStorage before navigation if configured
       if (config.localStorage) {
@@ -360,7 +402,14 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
         }, config.localStorage);
       }
 
-      await page.goto(url, { waitUntil: "networkidle0", timeout: 10000 });
+      console.log(`[Price Scraper] ${store} Navigating to URL...`);
+      const startTime = Date.now();
+      
+      // Use networkidle2 instead of networkidle0 - more forgiving for sites with persistent connections
+      // domcontentloaded is also an option for faster loading
+      await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
+      
+      console.log(`[Price Scraper] ${store} Page loaded in ${Date.now() - startTime}ms`);
 
       // Wait for price-related element to appear to ensure client-side pricing finished loading
       const waitSelector = config.containerSelectors?.[0] || config.priceSelectors[0];
@@ -371,9 +420,6 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
           console.warn(`[Price Scraper] ${store} price selector not found within timeout: ${waitSelector}`);
         }
       }
-
-      // Rate limit each store call
-      await new Promise((resolve) => setTimeout(resolve, 5000));
 
       // Extract prices from rendered page
       const extractedPrices = await extractPricesFromPage(page, config);
@@ -399,7 +445,6 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
           return result;
         }
       }
-
 
       // Fallback to HTML parsing
       console.log(`[Price Scraper] ${store} Falling back to HTML parsing`);

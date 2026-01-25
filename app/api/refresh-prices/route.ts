@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { scrapePrice, shouldRefreshPrice } from "@/lib/price-scraper";
+import { scrapePrice, shouldRefreshPrice, closeBrowser } from "@/lib/price-scraper";
 
 type RefreshScope = 
   | { type: 'single'; itemId: string }
@@ -25,6 +25,9 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error refreshing prices:", error);
     return NextResponse.json({ error: "Failed to refresh prices" }, { status: 500 });
+  } finally {
+    // Always close browser after all scraping is done
+    await closeBrowser();
   }
 }
 
@@ -159,6 +162,7 @@ async function processLinks(
             const updated = await updateProductLink(link, priceData);
             console.log(`Stored price for link ${link.id}: regular=${priceData.regularPrice}, discount=${priceData.discountPrice}`);
             updatedLinks.push(updated);
+
           } else {
             console.log(`No price data extracted for link ${link.id}`);
           }
@@ -166,6 +170,9 @@ async function processLinks(
           console.error(`Error refreshing price for link ${link.id}:`, error);
           // Continue with other links even if one fails
         }
+
+        // Rate limit each store call
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     })
   );
