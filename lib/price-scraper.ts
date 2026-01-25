@@ -1,5 +1,7 @@
 import * as cheerio from "cheerio";
 import puppeteer, { type Browser, type Page } from "puppeteer";
+import { promises as fs } from "fs";
+import path from "path";
 
 export type Store = "woolworths" | "coles" | "aldi";
 
@@ -8,7 +10,7 @@ export interface PriceData {
   discountPrice: number | null;
 }
 
-const SIX_DAYS_MS = 6 * 24 * 60 * 60 * 1000;
+const DEBUG_DIR = path.join(process.cwd(), "tmp", "scraper-debug");
 
 export function shouldRefreshPrice(lastRefreshed: Date | null): boolean {
   if (!lastRefreshed) return true;
@@ -27,6 +29,28 @@ export function shouldRefreshPrice(lastRefreshed: Date | null): boolean {
 let browserInstance: Browser | null = null;
 let browserLastUsed: number = Date.now();
 const BROWSER_TIMEOUT_MS = 5 * 60 * 1000;
+
+async function saveDebugArtifacts(page: Page, store: Store, reason: string) {
+  try {
+    await fs.mkdir(DEBUG_DIR, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const baseName = `${store}-${reason}-${timestamp}`;
+    const htmlPath = path.join(DEBUG_DIR, `${baseName}.html`);
+    const screenshotPath = path.join(DEBUG_DIR, `${baseName}.png`);
+
+    const html = await page.content();
+    await fs.writeFile(htmlPath, html, "utf8");
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+
+    console.warn(`[Price Scraper] Saved debug HTML to ${htmlPath}`);
+    console.warn(`[Price Scraper] Saved debug screenshot to ${screenshotPath}`);
+
+    return { htmlPath, screenshotPath };
+  } catch (error) {
+    console.error(`[Price Scraper] Failed to save debug artifacts (${reason}):`, error);
+    return null;
+  }
+}
 
 async function getBrowser(): Promise<Browser> {
   if (browserInstance && Date.now() - browserLastUsed > BROWSER_TIMEOUT_MS) {
@@ -223,66 +247,90 @@ async function extractPricesFromPage(page: Page, config: StoreConfig): Promise<{
 
 
 // Parse JSON-LD structured data
-function parseJsonLd($: any): number | null {
+export interface JsonLdResult {
+  current: number | null;
+  was: number | null;
+}
+
+function parseJsonLd($: any): JsonLdResult {
+  const result: JsonLdResult = { current: null, was: null };
   const jsonLdScripts = $('script[type="application/ld+json"]');
-  
+
+  const toNumber = (val: unknown): number | null => {
+    if (val === undefined || val === null) return null;
+    const n = typeof val === 'number' ? val : parseFloat(String(val));
+    return isNaN(n) ? null : n;
+  };
+
+  const processOffer = (offer: any) => {
+    if (!offer) return;
+
+    const price = toNumber(offer.price);
+    // PriceSpecification can be unit price or list price depending on store
+    const ps = offer.priceSpecification;
+    const psPrice = ps ? toNumber(ps.price ?? ps.value) : null;
+    const psType = ps?.priceType ? String(ps.priceType).toLowerCase() : '';
+    const isListPrice = psType.includes('listprice');
+
+    // Current price
+    if (price && price > 0) {
+      // Prefer the first encountered current price
+      if (result.current === null) result.current = price;
+    }
+
+    // Original/List price: only trust priceSpecification if it's flagged as ListPrice
+    if (isListPrice && psPrice && psPrice > 0) {
+      // Avoid unit prices by ensuring it's not lower than current
+      if (result.current && psPrice >= result.current) {
+        result.was = psPrice;
+      } else if (!result.current) {
+        // If current not known yet, keep as potential was; we'll reconcile later
+        result.was = psPrice;
+      }
+    }
+  };
+
+  const processJsonObject = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return;
+
+    const type = obj['@type'];
+
+    if (type === 'Product') {
+      if (obj.offers) {
+        const offers = Array.isArray(obj.offers) ? obj.offers : [obj.offers];
+        for (const offer of offers) processOffer(offer);
+      }
+      // Fallback: product-level price (rare)
+      if (result.current === null && obj.price !== undefined) {
+        const p = toNumber(obj.price);
+        if (p && p > 0) result.current = p;
+      }
+    } else if (type === 'Offer') {
+      processOffer(obj);
+    }
+  };
+
   for (let i = 0; i < jsonLdScripts.length; i++) {
     try {
-      const scriptContent = $(jsonLdScripts[i]).html() || "";
-      const jsonLd = JSON.parse(scriptContent);
-      
-      // Product type with offers
-      if (jsonLd["@type"] === "Product") {
-        if (jsonLd.offers) {
-          const offers = Array.isArray(jsonLd.offers) ? jsonLd.offers : [jsonLd.offers];
-          for (const offer of offers) {
-            // Check if out of stock
-            if (offer.availability) {
-              const availability = String(offer.availability).toLowerCase();
-              if (availability.includes('outofstock') || availability.includes('out of stock')) {
-                return null;
-              }
-            }
-            
-            if (offer.price !== undefined && offer.price !== null) {
-              const price = typeof offer.price === "number" ? offer.price : parseFloat(String(offer.price));
-              if (!isNaN(price) && price > 0) return price;
-            }
-            if (offer.priceSpecification?.value !== undefined) {
-              const price = typeof offer.priceSpecification.value === "number" 
-                ? offer.priceSpecification.value 
-                : parseFloat(String(offer.priceSpecification.value));
-              if (!isNaN(price) && price > 0) return price;
-            }
-          }
-        }
-        if (jsonLd.price !== undefined) {
-          const price = typeof jsonLd.price === "number" ? jsonLd.price : parseFloat(String(jsonLd.price));
-          if (!isNaN(price) && price > 0) return price;
-        }
+      const scriptContent = $(jsonLdScripts[i]).html() || '';
+      const parsed = JSON.parse(scriptContent);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) processJsonObject(item);
+      } else {
+        processJsonObject(parsed);
       }
-      
-      // Direct Offer type
-      if (jsonLd["@type"] === "Offer") {
-        // Check if out of stock
-        if (jsonLd.availability) {
-          const availability = String(jsonLd.availability).toLowerCase();
-          if (availability.includes('outofstock') || availability.includes('out of stock')) {
-            return null;
-          }
-        }
-        
-        if (jsonLd.price !== undefined) {
-          const price = typeof jsonLd.price === "number" ? jsonLd.price : parseFloat(String(jsonLd.price));
-          if (!isNaN(price) && price > 0) return price;
-        }
-      }
-    } catch (e) {
-      // Skip invalid JSON-LD
+    } catch {
+      // Skip invalid JSON-LD blocks
+      continue;
     }
   }
-  
-  return null;
+
+  return result;
+}
+
+// Testing helper
+export function parseJsonLdForTest($: any): JsonLdResult {
+  return parseJsonLd($);
 }
 
 // Parse HTML with Cheerio using selectors
@@ -290,26 +338,21 @@ function parseHtmlForPrices($: any, config: StoreConfig): PriceData {
   let currentPrice: number | null = null;
   let wasPrice: number | null = null;
 
-  // Try JSON-LD first (most reliable)
-  currentPrice = parseJsonLd($);
-
   // Try CSS selectors
-  if (!currentPrice) {
-    for (const selector of config.priceSelectors) {
-      try {
-        const elements = $(selector);
-        for (let i = 0; i < elements.length; i++) {
-          const text = $(elements[i]).text().trim();
-          const price = extractPrice(text);
-          if (price && price >= config.priceRange.min && price <= config.priceRange.max) {
-            currentPrice = price;
-            break;
-          }
+  for (const selector of config.priceSelectors) {
+    try {
+      const elements = $(selector);
+      for (let i = 0; i < elements.length; i++) {
+        const text = $(elements[i]).text().trim();
+        const price = extractPrice(text);
+        if (price && price >= config.priceRange.min && price <= config.priceRange.max) {
+          currentPrice = price;
+          break;
         }
-        if (currentPrice) break;
-      } catch (e) {
-        // Skip invalid selectors
       }
+      if (currentPrice) break;
+    } catch (e) {
+      // Skip invalid selectors
     }
   }
 
@@ -335,6 +378,36 @@ function parseHtmlForPrices($: any, config: StoreConfig): PriceData {
   return { regularPrice: currentPrice, discountPrice: null };
 }
 
+  // Coles sometimes serves an error shell but still embeds pricing inside __NEXT_DATA__
+  function parseColesNextData($: any): PriceData | null {
+    const script = $("#__NEXT_DATA__").html();
+    if (!script) return null;
+
+    try {
+      const data = JSON.parse(script);
+      const pricing = data?.props?.pageProps?.product?.pricing;
+      if (!pricing) return null;
+
+      const current = typeof pricing.now === "number" ? pricing.now : extractPrice(String(pricing.now ?? ""));
+      const was = typeof pricing.was === "number" ? pricing.was : extractPrice(String(pricing.was ?? ""));
+
+      if (current && was && was > current) {
+        return { regularPrice: was, discountPrice: current };
+      }
+      if (current) {
+        return { regularPrice: current, discountPrice: null };
+      }
+      if (was) {
+        return { regularPrice: was, discountPrice: null };
+      }
+
+      return null;
+    } catch (error) {
+      console.warn("[Price Scraper] Failed to parse Coles __NEXT_DATA__", error);
+      return null;
+    }
+  }
+
 // Main scraping function
 export async function scrapePrice(url: string, store: Store): Promise<PriceData> {
   console.log(`[Price Scraper] Starting scrape for ${store}: ${url}`);
@@ -355,42 +428,23 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
       );
       await page.setExtraHTTPHeaders({
-        'Accept-Language': 'en-AU,en;q=0.9',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Cache-Control': 'max-age=0',
+        'Accept': '*/*',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Priority': 'u=1, i',
+        'Sec-Ch-Ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
       });
 
       // Hide automation indicators
       await page.evaluateOnNewDocument(() => {
-        // Override the navigator.webdriver property
-        Object.defineProperty(navigator, 'webdriver', {
-          get: () => false,
-        });
-
-        // Mock plugins and mimeTypes to look like a real browser
-        Object.defineProperty(navigator, 'plugins', {
-          get: () => [1, 2, 3, 4, 5],
-        });
-
-        // Add chrome object
-        (window as any).chrome = {
-          runtime: {},
-        };
-
-        // Override permissions
-        const originalQuery = window.navigator.permissions.query;
-        window.navigator.permissions.query = (parameters: any) => (
-          parameters.name === 'notifications' ?
-            Promise.resolve({ state: Notification.permission } as PermissionStatus) :
-            originalQuery(parameters)
-        );
+          delete Object.getPrototypeOf(navigator).webdriver;
       });
 
       // Set localStorage before navigation if configured
@@ -418,6 +472,7 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
           await page.waitForSelector(waitSelector, { timeout: 10000 });
         } catch (e) {
           console.warn(`[Price Scraper] ${store} price selector not found within timeout: ${waitSelector}`);
+          await saveDebugArtifacts(page, store, "selector-timeout");
         }
       }
 
@@ -450,19 +505,30 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
       console.log(`[Price Scraper] ${store} Falling back to HTML parsing`);
       const $ = cheerio.load(html);
       
-      // Check for out of stock in JSON-LD (will return null if out of stock)
-      const jsonLdPrice = parseJsonLd($);
-      console.log(`[Price Scraper] ${store} JSON-LD price check:`, jsonLdPrice);
-      if (jsonLdPrice === null) {
-        // Check if null is due to out of stock vs no price data
-        const bodyText = $('body').text().toLowerCase();
-        if (bodyText.includes('out of stock') || 
-            bodyText.includes('currently unavailable') ||
-            bodyText.includes('temporarily unavailable')) {
-          return { regularPrice: null, discountPrice: null };
+      // Check for JSON-LD to extract prices
+      const jsonLdData = parseJsonLd($);
+      console.log(`[Price Scraper] ${store} JSON-LD check:`, jsonLdData);
+
+      // If JSON-LD already provides pricing, return immediately
+      if (jsonLdData.current !== null || jsonLdData.was !== null) {
+        const hasDiscount = jsonLdData.was !== null && jsonLdData.current !== null && jsonLdData.was > jsonLdData.current;
+        if (hasDiscount) {
+          return { regularPrice: jsonLdData.was!, discountPrice: jsonLdData.current! };
+        }
+        const price = jsonLdData.current ?? jsonLdData.was;
+        return { regularPrice: price, discountPrice: null };
+      }
+
+      // Coles: fallback to __NEXT_DATA__ when the UI shell shows an error but data is present
+      if (store === "coles") {
+        const nextDataPrices = parseColesNextData($);
+        if (nextDataPrices) {
+          console.log(`[Price Scraper] ${store} Parsed pricing from __NEXT_DATA__`, nextDataPrices);
+          return nextDataPrices;
         }
       }
       
+      // Otherwise check HTML selectors
       const result = parseHtmlForPrices($, config);
       console.log(`[Price Scraper] ${store} HTML parsing result:`, result);
 

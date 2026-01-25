@@ -138,6 +138,7 @@ async function processLinks(
     lastRefreshed: Date | null;
   }>
 ): Promise<any[]> {
+  const rateLimitMs = process.env.NODE_ENV === 'test' ? 0 : 5000;
   // Group links by store for parallel processing
   const linksByStore = new Map<string, typeof links>();
   links.forEach(link => {
@@ -172,7 +173,9 @@ async function processLinks(
         }
 
         // Rate limit each store call
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        if (rateLimitMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, rateLimitMs));
+        }
       }
     })
   );

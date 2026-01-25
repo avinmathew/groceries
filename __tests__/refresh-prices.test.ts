@@ -28,6 +28,7 @@ jest.mock('@/lib/db', () => ({
 jest.mock('@/lib/price-scraper', () => ({
   scrapePrice: jest.fn(),
   shouldRefreshPrice: jest.fn(),
+  closeBrowser: jest.fn(),
 }));
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
