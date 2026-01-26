@@ -136,7 +136,8 @@ export async function queueMutation<T = any>(
       
       if (response.ok) {
         const data = await response.json();
-        // Update cache with server response
+        // Invalidate related caches first, then update with new data
+        await invalidateCache(url);
         await cacheResponse(url, data);
         // Don't queue - request succeeded
         return data;
@@ -156,6 +157,36 @@ export async function queueMutation<T = any>(
   }
 
   return optimisticResult;
+}
+
+/**
+ * Invalidate cache entries based on URL pattern
+ */
+export async function invalidateCache(url: string): Promise<void> {
+  try {
+    if (url.includes('/api/grocery-items')) {
+      // If a grocery item was modified, invalidate all shopping lists that might contain it
+      // We clear shopping list items cache since the structure changed
+      const allShoppingListIds = (await offlineDB.shoppingLists.toArray()).map(l => l.id);
+      for (const listId of allShoppingListIds) {
+        const items = await offlineDB.shoppingListItems.where('shoppingListId').equals(listId).toArray();
+        for (const item of items) {
+          await offlineDB.shoppingListItems.delete(item.id);
+        }
+      }
+    } else if (url.includes('/api/shopping-lists/')) {
+      // If a shopping list was modified, clear its items
+      const listId = url.split('/api/shopping-lists/')[1]?.split('/')[0]?.split('?')[0];
+      if (listId) {
+        const items = await offlineDB.shoppingListItems.where('shoppingListId').equals(listId).toArray();
+        for (const item of items) {
+          await offlineDB.shoppingListItems.delete(item.id);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error invalidating cache:', error);
+  }
 }
 
 /**

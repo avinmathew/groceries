@@ -136,6 +136,7 @@ export function GroceryItemRow({
           width={20}
           height={20}
           className="object-contain"
+          loading="eager"
         />
         {hasDiscount ? (
           <Badge className={`${isStale ? "bg-gray-400 text-white" : "bg-discount text-black"}`} style={{ fontSize: '1rem', padding: '0.2rem 0.375rem' }}>

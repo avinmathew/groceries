@@ -1,139 +1,122 @@
-const CACHE_NAME = 'mygroceries-v5';
-const RUNTIME_CACHE = 'mygroceries-runtime-v5';
+const BASE_PATH = '/groceries';
+const CACHE_VERSION = 'v6';
+const CACHE_NAME = `mygroceries-${CACHE_VERSION}`;
+const RUNTIME_CACHE = `mygroceries-runtime-${CACHE_VERSION}`;
+
+const OFFLINE_URL = `${BASE_PATH}/offline`;
 const urlsToCache = [
-  '/groceries/',
-  '/groceries/manifest.json',
-  '/groceries/icon-192x192.svg',
-  '/groceries/icon-512x512.svg',
-  '/groceries/offline'
+  `${BASE_PATH}/`,
+  `${BASE_PATH}/manifest.json`,
+  `${BASE_PATH}/icon-192x192.svg`,
+  `${BASE_PATH}/icon-512x512.svg`,
+  OFFLINE_URL,
 ];
 
-// Install event - cache resources
+async function cacheFirst(request, cacheName, matchOptions) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request, matchOptions);
+  if (cached) return cached;
+
+  const response = await fetch(request);
+  if (response && response.ok) {
+    cache.put(request, response.clone());
+  }
+  return response;
+}
+
+async function networkFirst(request, cacheName) {
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw error;
+  }
+}
+
+async function navigationNetworkFirst(request) {
+  try {
+    return await fetch(request);
+  } catch (error) {
+    const offlinePage = await caches.match(OFFLINE_URL);
+    if (offlinePage) return offlinePage;
+
+    return new Response(
+      '<html><body><h1>Offline</h1><p>Please check your connection and try again.</p></body></html>',
+      { headers: { 'Content-Type': 'text/html' } }
+    );
+  }
+}
+
+function isApiPath(pathname) {
+  return pathname.startsWith(`${BASE_PATH}/api/`);
+}
+
+function isStoreIconPath(pathname) {
+  return pathname.includes('/store_icons/');
+}
+
+// Install event - cache core shell resources
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(urlsToCache);
-    })
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.addAll(urlsToCache);
+      await self.skipWaiting();
+    })()
   );
-  // Activate worker immediately
-  self.skipWaiting();
 });
 
-// Fetch event - stale-while-revalidate for API, cache first for assets
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  
-  // Log all requests (can be noisy, comment out if needed)
-  // console.log('[SW] Intercepted:', event.request.method, url.pathname);
-  
-  // API GET routes - stale-while-revalidate
-  if (url.pathname.startsWith('/groceries/api/') && event.request.method === 'GET') {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Let the browser handle cross-origin requests.
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // API routes
+  if (isApiPath(url.pathname)) {
+    if (request.method === 'GET') {
+      event.respondWith(networkFirst(request, RUNTIME_CACHE));
+      return;
+    }
+
+    // Mutations - network only, with an offline-friendly error payload.
     event.respondWith(
-      caches.open(RUNTIME_CACHE).then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
-          const fetchPromise = fetch(event.request)
-            .then((networkResponse) => {
-              if (networkResponse && networkResponse.status === 200) {
-                cache.put(event.request, networkResponse.clone());
-              }
-              return networkResponse;
-            })
-            .catch(() => cachedResponse); // Return cached if network fails
-          
-          // Return cached immediately, update in background
-          return cachedResponse || fetchPromise;
-        });
-      })
+      fetch(request).catch(() =>
+        new Response(JSON.stringify({ error: 'Offline - mutation queued' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
     );
     return;
   }
-  
-  // API mutation routes (POST/PATCH/PUT/DELETE) - network only
-  if (url.pathname.startsWith('/groceries/api/')) {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(
-          JSON.stringify({ error: 'Offline - mutation queued' }),
-          { 
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
-      })
-    );
+
+  // Navigation (HTML) - network first; do not cache arbitrary pages to avoid stale soft-refresh.
+  if (request.mode === 'navigate') {
+    event.respondWith(navigationNetworkFirst(request));
     return;
   }
-  
-  // Images (including store icons) - cache first, long-term cache
-  if (event.request.destination === 'image' || url.pathname.includes('/store_icons/')) {
-    console.log('[SW] Image request:', url.pathname, 'Full URL:', event.request.url);
-    event.respondWith(
-      caches.open(CACHE_NAME).then((cache) => {
-        return cache.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
-          if (cachedResponse) {
-            console.log('[SW] ✓ Serving image from cache:', url.pathname);
-            return cachedResponse;
-          }
-          
-          console.log('[SW] ✗ Image not in cache, fetching:', url.pathname);
-          return fetch(event.request).then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              console.log('[SW] ✓ Caching image:', url.pathname);
-              cache.put(event.request, networkResponse.clone());
-            } else {
-              console.log('[SW] ✗ Image fetch failed or non-200:', url.pathname, networkResponse?.status);
-            }
-            return networkResponse;
-          }).catch((error) => {
-            console.error('[SW] ✗ Image fetch error:', url.pathname, error);
-            throw error;
-          });
-        });
-      })
-    );
+
+  // Images - cache first (ignore query params)
+  if (request.destination === 'image' || isStoreIconPath(url.pathname)) {
+    event.respondWith(cacheFirst(request, CACHE_NAME, { ignoreSearch: true }));
     return;
   }
-  
-  // Static assets and pages - cache first with network fallback
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        if (response) {
-          return response;
-        }
-        
-        return fetch(event.request)
-          .then((response) => {
-            // Cache successful responses
-            if (response && response.status === 200) {
-              const responseToCache = response.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-            }
-            return response;
-          })
-          .catch((error) => {
-            console.error('Fetch failed for', event.request.url, error);
-            // Fallback to offline page for navigation requests
-            if (event.request.mode === 'navigate') {
-              return caches.match('/groceries/offline').then((offlinePage) => {
-                if (offlinePage) {
-                  return offlinePage;
-                }
-                // If offline page not cached, return a basic HTML response
-                return new Response(
-                  '<html><body><h1>Offline</h1><p>Please check your connection and try again.</p></body></html>',
-                  { headers: { 'Content-Type': 'text/html' } }
-                );
-              });
-            }
-            // For other requests, throw error to let browser handle it
-            throw error;
-          });
-      })
-  );
+
+  // Other GET assets (scripts, styles, fonts, etc.) - cache first
+  if (request.method === 'GET') {
+    event.respondWith(cacheFirst(request, CACHE_NAME));
+  }
 });
 
 // Background Sync for queued mutations

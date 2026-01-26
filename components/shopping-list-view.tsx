@@ -67,6 +67,8 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   const { toast } = useToast();
   const syncContext = useSync();
   const router = useRouter();
+
+  const unwrapApiResult = (result: any) => result?.data ?? result;
   
   // Only destructure what we need when we need it to avoid re-renders
   const isOnline = syncContext.isOnline;
@@ -77,9 +79,8 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     const loadFromCache = async () => {
       try {
         const cached = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${initialShoppingList.id}`);
-        if (cached?.data) {
-          setShoppingList(cached.data);
-        }
+        const data = unwrapApiResult(cached);
+        if (data) setShoppingList(data);
       } catch (error) {
         console.log('Using server-rendered data');
       }
@@ -89,12 +90,27 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
 
   const handleItemAdded = async () => {
     try {
-      const response = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
-      if (response?.data) {
-        setShoppingList(response.data);
+      // Force a network fetch to get the latest shopping list with the new item
+      const response = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`, {
+        method: 'GET',
+        cache: 'no-store'
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const freshData = result?.data || result;
+        setShoppingList(freshData);
       }
     } catch (error) {
       console.error("Failed to refresh shopping list after item added:", error);
+      // Fallback: try the offline cache
+      try {
+        const cachedResponse = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
+        if (cachedResponse?.data) {
+          setShoppingList(cachedResponse.data);
+        }
+      } catch (cacheError) {
+        console.error("Cache fallback also failed:", cacheError);
+      }
     }
   };
 
@@ -123,10 +139,26 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
 
       if (!response.ok) throw new Error("Failed to refresh prices");
 
-      // Refresh is complete, now fetch the updated shopping list data
-      const updatedResponse = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
-      if (updatedResponse?.data) {
-        setShoppingList(updatedResponse.data);
+      // Refresh is complete, now fetch the updated shopping list data (force fresh)
+      try {
+        const updatedResponse = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
+
+        if (updatedResponse.ok) {
+          const result = await updatedResponse.json();
+          const freshData = unwrapApiResult(result);
+          if (freshData) setShoppingList(freshData);
+        }
+      } catch (error) {
+        // Fallback: try the offline cache
+        const cached = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
+        const cachedData = unwrapApiResult(cached);
+        if (cachedData) setShoppingList(cachedData);
       }
 
       setIsRefreshing(false);

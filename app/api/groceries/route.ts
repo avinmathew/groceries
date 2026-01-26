@@ -74,9 +74,17 @@ export async function GET() {
         return a.name.localeCompare(b.name);
       });
 
-    return NextResponse.json(groceries);
+    return NextResponse.json(groceries, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    });
   } catch (error) {
     console.error("Error fetching groceries:", error);
-    return NextResponse.json({ error: "Failed to fetch groceries" }, { status: 500 });
+    const errorResponse = NextResponse.json({ error: "Failed to fetch groceries" }, { status: 500 });
+    errorResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    return errorResponse;
   }
 }

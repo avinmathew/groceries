@@ -21,7 +21,9 @@ export async function GET(
     });
 
     if (!groceryItem) {
-      return NextResponse.json({ error: "Grocery item not found" }, { status: 404 });
+      const errorResponse = NextResponse.json({ error: "Grocery item not found" }, { status: 404 });
+      errorResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      return errorResponse;
     }
 
     // Combine all price history from all product links
@@ -33,12 +35,20 @@ export async function GET(
       }))
     );
 
-    return NextResponse.json(allHistory);
+    return NextResponse.json(allHistory, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    });
   } catch (error) {
     console.error("Error fetching price history:", error);
-    return NextResponse.json(
+    const errorResponse = NextResponse.json(
       { error: "Failed to fetch price history" },
       { status: 500 }
     );
+    errorResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    return errorResponse;
   }
 }

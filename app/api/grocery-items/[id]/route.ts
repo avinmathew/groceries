@@ -20,7 +20,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     });
 
     if (shoppingListItem) {
-      return successResponse(shoppingListItem);
+      const response = successResponse(shoppingListItem);
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+      return response;
     }
 
     // Otherwise treat id as grocery item id
@@ -37,7 +41,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return notFoundError("Grocery item");
     }
 
-    return successResponse(groceryItem);
+    const response = successResponse(groceryItem);
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    return response;
   } catch (error) {
     return serverError("Failed to fetch shopping list item", getErrorMessage(error));
   }

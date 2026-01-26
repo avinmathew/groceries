@@ -12,13 +12,21 @@ export async function GET(
       take: 100, // Limit to last 100 records
     });
 
-    return NextResponse.json(priceHistory);
+    return NextResponse.json(priceHistory, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    });
   } catch (error) {
     console.error("Error fetching price history:", error);
-    return NextResponse.json(
+    const errorResponse = NextResponse.json(
       { error: "Failed to fetch price history" },
       { status: 500 }
     );
+    errorResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    return errorResponse;
   }
 }
 

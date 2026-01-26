@@ -18,7 +18,12 @@ export async function GET() {
       },
     });
 
-    return successResponse(shoppingLists);
+    const response = successResponse(shoppingLists);
+    // Prevent caching in development - always fetch fresh data
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    return response;
   } catch (error) {
     return serverError("Failed to fetch shopping lists", getErrorMessage(error));
   }

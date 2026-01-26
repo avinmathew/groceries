@@ -147,10 +147,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
       name: shoppingList.name,
       categoryGroups,
       completedItems: formattedCompletedItems,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
   } catch (error) {
     console.error("Error fetching shopping list:", error);
-    return NextResponse.json({ error: "Failed to fetch shopping list" }, { status: 500 });
+    const errorResponse = NextResponse.json({ error: "Failed to fetch shopping list" }, { status: 500 });
+    errorResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    return errorResponse;
   }
 }
 

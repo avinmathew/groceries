@@ -1,4 +1,5 @@
 import { offlineDB, PendingMutation } from './offline-db';
+import { invalidateCache } from './api-utils';
 
 export function generateClientId(): string {
   return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -70,6 +71,8 @@ export async function flushMutationQueue(): Promise<FlushResult> {
 
       if (response.ok) {
         console.log(`✓ Success: ${mutation.method} ${mutation.url}`);
+        // Invalidate cache for this mutation's URL
+        await invalidateCache(mutation.url);
         await removeMutation(mutation.id);
         result.success++;
       } else {

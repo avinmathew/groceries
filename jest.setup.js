@@ -9,10 +9,18 @@ global.TextDecoder = TextDecoder;
 // Mock NextResponse for tests
 jest.mock('next/server', () => ({
   NextResponse: {
-    json: (data, init) => ({
-      status: init?.status || 200,
-      json: async () => data,
-    }),
+    json: (data, init) => {
+      const headerStore = new Map(Object.entries(init?.headers || {}));
+      return {
+        status: init?.status || 200,
+        headers: {
+          set: (key, value) => headerStore.set(key, value),
+          get: (key) => headerStore.get(key),
+          has: (key) => headerStore.has(key),
+        },
+        json: async () => data,
+      };
+    },
   },
   NextRequest: class NextRequest {
     constructor(url, init) {
