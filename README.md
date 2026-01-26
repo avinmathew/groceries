@@ -12,14 +12,29 @@ A modern grocery shopping list web application inspired by OurGroceries with pri
 - **Notes**: Add notes to grocery items
 - **Quantity Management**: Track quantities with Less/More buttons
 - **Product Links**: Add multiple product links per store for price comparison
+- **Offline-First**: Full offline support with automatic sync when online
+- **PWA**: Progressive Web App capabilities with service worker caching
+
+## Offline-First Architecture
+
+The app implements a comprehensive offline-first strategy for seamless use without connectivity:
+
+- **Local Storage**: IndexedDB (via Dexie) stores shopping lists, items, categories, and product links
+- **Mutation Queue**: Actions performed offline are queued and automatically synced when back online
+- **Optimistic UI**: Instant feedback for all user actions, even when offline
+- **Cache-First Reads**: Data loads instantly from cache, updates in background
+- **Service Worker**: Stale-while-revalidate caching strategy for optimal performance
+- **Sync Status**: Visual badge shows offline/syncing/pending states
+- **Auto-Sync**: Syncs on reconnection, tab visibility, and every 30 seconds
 
 ## Tech Stack
 
 - **Framework**: Next.js 14 (App Router)
 - **Language**: TypeScript
 - **Database**: SQLite with Prisma ORM
+- **Offline Storage**: IndexedDB with Dexie
 - **Styling**: Tailwind CSS with Shadcn UI components
-- **State Management**: React Query (TanStack Query) and Zustand
+- **PWA**: Service Worker with cache-first strategies
 - **Testing**: Jest + React Testing Library
 
 ## Getting Started

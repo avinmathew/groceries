@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { GroceryItemRow } from "@/components/grocery-item-row";
 import { AddGroceryDialog } from "@/components/add-grocery-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useSync } from "@/lib/sync-provider";
+import { offlineFetch, queueMutation } from "@/lib/api-utils";
+import { offlineDB } from "@/lib/offline-db";
 import { BASE_PATH } from "@/lib/utils";
 
 type ShoppingList = {
@@ -62,14 +65,29 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [shoppingList, setShoppingList] = useState(initialShoppingList);
   const { toast } = useToast();
+  const { isOnline, sync } = useSync();
   const router = useRouter();
+
+  // Load from cache on mount
+  useEffect(() => {
+    const loadFromCache = async () => {
+      try {
+        const cached = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${initialShoppingList.id}`);
+        if (cached?.data) {
+          setShoppingList(cached.data);
+        }
+      } catch (error) {
+        console.log('Using server-rendered data');
+      }
+    };
+    loadFromCache();
+  }, [initialShoppingList.id]);
 
   const handleItemAdded = async () => {
     try {
-      const response = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
-      if (response.ok) {
-        const updatedList = await response.json();
-        setShoppingList(updatedList);
+      const response = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
+      if (response?.data) {
+        setShoppingList(response.data);
       }
     } catch (error) {
       console.error("Failed to refresh shopping list after item added:", error);
@@ -77,6 +95,15 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   };
 
   const handleRefreshPrices = async () => {
+    if (!isOnline) {
+      toast({
+        title: "Offline",
+        description: "Price refresh requires an internet connection",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsRefreshing(true);
     try {
       // Collect IDs of all active (non-completed) items
@@ -93,14 +120,9 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
       if (!response.ok) throw new Error("Failed to refresh prices");
 
       // Refresh is complete, now fetch the updated shopping list data
-      // Add cache-busting parameter to ensure fresh data
-      const updatedResponse = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}?t=${Date.now()}`, {
-        cache: 'no-store'
-      });
-      if (updatedResponse.ok) {
-        const updatedShoppingList = await updatedResponse.json();
-        // Force a complete state update by creating a new object
-        setShoppingList({ ...updatedShoppingList });
+      const updatedResponse = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
+      if (updatedResponse?.data) {
+        setShoppingList(updatedResponse.data);
       }
 
       setIsRefreshing(false);
@@ -120,94 +142,102 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   };
 
   const handleToggleComplete = async (itemId: string, isCompleted: boolean) => {
-    try {
-      const response = await fetch(`${BASE_PATH}/api/grocery-items/${itemId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isCompleted: !isCompleted }),
-      });
+    // Optimistic update
+    const newIsCompleted = !isCompleted;
+    setShoppingList(prev => {
+      let updatedGroups = prev.categoryGroups.map(group => ({
+        ...group,
+        items: group.items.filter(item => item.id !== itemId)
+      }));
 
-      if (!response.ok) throw new Error("Failed to update item");
-
-      // Update local state instead of reloading
-      setShoppingList(prev => {
-        const newIsCompleted = !isCompleted;
+      if (newIsCompleted) {
+        // Move to completed items
+        const itemToMove = prev.categoryGroups
+          .flatMap(group => group.items)
+          .find(item => item.id === itemId);
         
-        let updatedGroups = prev.categoryGroups.map(group => ({
-          ...group,
-          items: group.items.filter(item => item.id !== itemId)
-        }));
-
-        if (newIsCompleted) {
-          // Move to completed items
-          const itemToMove = prev.categoryGroups
-            .flatMap(group => group.items)
-            .find(item => item.id === itemId);
-          
-          if (itemToMove) {
-            // Filter out empty groups
-            updatedGroups = updatedGroups.filter(group => group.items.length > 0);
-            
-            return {
-              ...prev,
-              categoryGroups: updatedGroups,
-              // Completed item is added to the start of the list
-              completedItems: [{
-                ...itemToMove,
-                isCompleted: true,
-                completedAt: new Date()
-              }, ...prev.completedItems]
-            };
-          }
-        } else {
-          // Move back to active items
-          const itemToMove = prev.completedItems.find(item => item.id === itemId);
-          
-          if (itemToMove) {
-            const activeItem = {
+        if (itemToMove) {
+          updatedGroups = updatedGroups.filter(group => group.items.length > 0);
+          return {
+            ...prev,
+            categoryGroups: updatedGroups,
+            completedItems: [{
               ...itemToMove,
-              isCompleted: false,
-              completedAt: null
-            };
-            
-            // Find or create the target category group
-            let targetGroupIndex = updatedGroups.findIndex(group => group.category.id === itemToMove.categoryId);
-            
-            if (targetGroupIndex === -1) {
-              // Category group was removed or doesn't exist. Recreate it.
-              const newGroup = itemToMove.category;
-              updatedGroups = [
-                ...updatedGroups,
-                { category: newGroup, items: [activeItem] }
-              ].sort((a, b) => a.category.order - b.category.order);
-            } else {
-              // Category group exists, add item to it
-              updatedGroups = [
-                ...updatedGroups.slice(0, targetGroupIndex),
-                {
-                  ...updatedGroups[targetGroupIndex],
-                  items: [...updatedGroups[targetGroupIndex].items, activeItem]
-                },
-                ...updatedGroups.slice(targetGroupIndex + 1)
-              ];
-            }
-            
-            return {
-              ...prev,
-              categoryGroups: updatedGroups,
-              completedItems: prev.completedItems.filter(item => item.id !== itemId)
-            };
-          }
+              isCompleted: true,
+              completedAt: new Date()
+            }, ...prev.completedItems]
+          };
         }
+      } else {
+        // Move back to active items
+        const itemToMove = prev.completedItems.find(item => item.id === itemId);
+        
+        if (itemToMove) {
+          const activeItem = {
+            ...itemToMove,
+            isCompleted: false,
+            completedAt: null
+          };
+          
+          let targetGroupIndex = updatedGroups.findIndex(group => group.category.id === itemToMove.categoryId);
+          
+          if (targetGroupIndex === -1) {
+            const newGroup = itemToMove.category;
+            updatedGroups = [
+              ...updatedGroups,
+              { category: newGroup, items: [activeItem] }
+            ].sort((a, b) => a.category.order - b.category.order);
+          } else {
+            updatedGroups = [
+              ...updatedGroups.slice(0, targetGroupIndex),
+              {
+                ...updatedGroups[targetGroupIndex],
+                items: [...updatedGroups[targetGroupIndex].items, activeItem]
+              },
+              ...updatedGroups.slice(targetGroupIndex + 1)
+            ];
+          }
+          
+          return {
+            ...prev,
+            categoryGroups: updatedGroups,
+            completedItems: prev.completedItems.filter(item => item.id !== itemId)
+          };
+        }
+      }
+      return prev;
+    });
 
-        return prev;
-      });
-
+    // Queue mutation
+    try {
+      await queueMutation(
+        'PATCH',
+        `${BASE_PATH}/api/grocery-items/${itemId}`,
+        { isCompleted: newIsCompleted },
+        async () => {
+          // Update in IndexedDB
+          const item = await offlineDB.shoppingListItems.get(itemId);
+          if (item) {
+            await offlineDB.shoppingListItems.put({
+              ...item,
+              completed: newIsCompleted,
+              updatedAt: new Date().toISOString(),
+              _synced: false,
+            });
+          }
+          return null;
+        }
+      );
+      
+      // Trigger sync if online
+      if (isOnline) {
+        await sync();
+      }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update item",
-        variant: "destructive",
+        description: isOnline ? "Failed to update item" : "Update queued for sync",
+        variant: isOnline ? "destructive" : "default",
       });
     }
   };

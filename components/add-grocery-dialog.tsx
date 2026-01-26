@@ -14,6 +14,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useSync } from "@/lib/sync-provider";
+import { offlineFetch, queueMutation } from "@/lib/api-utils";
+import { offlineDB } from "@/lib/offline-db";
 import { BASE_PATH } from "@/lib/utils";
 
 type Grocery = {
@@ -37,12 +40,13 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { isOnline, sync } = useSync();
 
   useEffect(() => {
     // Fetch all existing groceries for autocomplete
-    fetch(`${BASE_PATH}/api/groceries`)
-      .then((res) => res.json())
-      .then((data) => {
+    offlineFetch(`${BASE_PATH}/api/groceries`)
+      .then((response) => {
+        const data = response?.data || response;
         if (Array.isArray(data)) {
           const normalized = data.map((item) => ({
             name: item.name,
@@ -76,24 +80,42 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
   const handleSelectGrocery = async (groceryName: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${BASE_PATH}/api/grocery-items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await queueMutation(
+        'POST',
+        `${BASE_PATH}/api/grocery-items`,
+        {
           name: groceryName,
           shoppingListId,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Failed to add grocery item");
+        },
+        async () => {
+          // Optimistic: add temporary item to cache
+          const tempId = `temp_${Date.now()}`;
+          await offlineDB.shoppingListItems.add({
+            id: tempId,
+            shoppingListId,
+            groceryItemId: tempId,
+            quantity: 1,
+            notes: null,
+            completed: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            _synced: false,
+          });
+          return null;
+        }
+      );
 
       setOpen(false);
       setSearchQuery("");
-      router.refresh();
       onItemAdded?.();
+      
+      if (isOnline) {
+        await sync();
+      }
+      
       toast({
         title: "Success",
-        description: "Item added to shopping list",
+        description: isOnline ? "Item added to shopping list" : "Item queued (offline)",
       });
     } catch (error) {
       toast({

@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
+import { SyncProvider } from "@/lib/sync-provider";
+import { OfflineStatusBadge } from "@/components/offline-status-badge";
 import { BASE_PATH } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -43,9 +45,12 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href={`${BASE_PATH}/favicon-16x16.png`}/>
       </head>
       <body className={inter.className}>
-        {children}
-        <Toaster />
-        <ServiceWorkerRegister />
+        <SyncProvider>
+          {children}
+          <Toaster />
+          <OfflineStatusBadge />
+          <ServiceWorkerRegister />
+        </SyncProvider>
       </body>
     </html>
   );

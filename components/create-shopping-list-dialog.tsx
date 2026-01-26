@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useSync } from "@/lib/sync-provider";
+import { queueMutation } from "@/lib/api-utils";
+import { offlineDB } from "@/lib/offline-db";
 import { BASE_PATH } from "@/lib/utils";
 
 export function CreateShoppingListDialog() {
@@ -23,6 +26,7 @@ export function CreateShoppingListDialog() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { isOnline, sync } = useSync();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,22 +34,36 @@ export function CreateShoppingListDialog() {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${BASE_PATH}/api/shopping-lists`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
-      });
+      await queueMutation(
+        'POST',
+        `${BASE_PATH}/api/shopping-lists`,
+        { name: name.trim() },
+        async () => {
+          // Optimistic: add temporary list
+          const tempId = `temp_${Date.now()}`;
+          await offlineDB.shoppingLists.add({
+            id: tempId,
+            name: name.trim(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            _synced: false,
+          });
+          return null;
+        }
+      );
 
-      if (!response.ok) throw new Error("Failed to create shopping list");
-
-      const data = await response.json();
       setOpen(false);
       setName("");
+      
+      if (isOnline) {
+        await sync();
+      }
+      
       toast({
         title: "Success",
-        description: "Shopping list created successfully",
+        description: isOnline ? "Shopping list created successfully" : "List queued (offline)",
       });
-      // Hard refresh to ensure we see the new data in production
+      
       router.replace("/shopping-lists");
       router.refresh();
     } catch (error) {
