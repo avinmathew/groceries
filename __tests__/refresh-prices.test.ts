@@ -138,8 +138,10 @@ describe('POST /api/refresh-prices - Single Item Strategy', () => {
     const response = await POST(request);
     const data = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(data.error).toContain('Failed to refresh prices');
+    // Now returns 200 immediately and errors are logged in background
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.message).toContain('Price refresh started');
   });
 });
 
@@ -363,6 +365,11 @@ describe('POST /api/refresh-prices - Price History', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(200);
+    expect(response.json()).resolves.toMatchObject({ success: true });
+    
+    // Wait a bit for async processing to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     expect(mockPrisma.priceHistory.create).toHaveBeenCalledWith({
       data: {
         productLinkId: 'link1',
@@ -412,6 +419,11 @@ describe('POST /api/refresh-prices - Price History', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(200);
+    expect(response.json()).resolves.toMatchObject({ success: true });
+    
+    // Wait a bit for async processing to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     expect(mockPrisma.priceHistory.create).toHaveBeenCalledWith({
       data: {
         productLinkId: 'link1',
@@ -475,6 +487,6 @@ describe('POST /api/refresh-prices - Error Handling', () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toContain('Failed to refresh prices');
+    expect(data.error).toContain('Failed to start price refresh');
   });
 });

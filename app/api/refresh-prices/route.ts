@@ -9,7 +9,7 @@ type RefreshScope =
 
 export async function POST(request: Request) {
   try {
-    const { groceryItemId, groceryItemIds } = await request.json();
+    const { groceryItemId, groceryItemIds, shoppingListId } = await request.json();
 
     let scope: RefreshScope;
     if (groceryItemId) {
@@ -20,14 +20,40 @@ export async function POST(request: Request) {
       scope = { type: 'all' };
     }
 
-    const updatedLinks = await refreshPrices(scope);
-    return NextResponse.json({ success: true, updatedLinks });
+    // Mark shopping list as refreshing if provided
+    if (shoppingListId) {
+      await prisma.shoppingList.update({
+        where: { id: shoppingListId },
+        data: { refreshStatus: 'refreshing' },
+      }).catch(err => console.error('Failed to mark list as refreshing:', err));
+    }
+
+    // Start the refresh process in the background (fire and forget)
+    // This allows the response to return immediately so the UI can start polling
+    refreshPrices(scope)
+      .then(() => {
+        console.log('Price refresh completed successfully');
+      })
+      .catch((error) => {
+        console.error("Background price refresh error:", error);
+      })
+      .finally(async () => {
+        // Mark shopping list as idle when done
+        if (shoppingListId) {
+          await prisma.shoppingList.update({
+            where: { id: shoppingListId },
+            data: { refreshStatus: 'idle' },
+          }).catch(err => console.error('Failed to mark list as idle:', err));
+        }
+        // Always close browser after all scraping is done
+        await closeBrowser();
+      });
+
+    // Return immediately so client can start polling
+    return NextResponse.json({ success: true, message: 'Price refresh started' });
   } catch (error) {
-    console.error("Error refreshing prices:", error);
-    return NextResponse.json({ error: "Failed to refresh prices" }, { status: 500 });
-  } finally {
-    // Always close browser after all scraping is done
-    await closeBrowser();
+    console.error("Error starting price refresh:", error);
+    return NextResponse.json({ error: "Failed to start price refresh" }, { status: 500 });
   }
 }
 

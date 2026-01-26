@@ -373,7 +373,7 @@ export function GroceryItemEditView({
   const handleRefreshPrices = async () => {
     setIsRefreshing(true);
     try {
-      // Start the refresh process in the background
+      // Start the refresh process in the background (returns immediately)
       const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -381,6 +381,12 @@ export function GroceryItemEditView({
       });
 
       if (!response.ok) throw new Error("Failed to start price refresh");
+
+      // Show immediate feedback
+      toast({
+        title: "Refreshing prices...",
+        description: "Prices will update as they are fetched",
+      });
 
       // Poll for updates every 3 seconds for up to 2 minutes
       const pollInterval = 3000; // 3 seconds
@@ -391,7 +397,12 @@ export function GroceryItemEditView({
         const elapsed = Date.now() - startTime;
         
         // Fetch updated data
-        const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.groceryItemId}`);
+        const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.groceryItemId}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
         if (updatedItemResponse.ok) {
           const updatedItem = await updatedItemResponse.json();
           const refreshedLinks = updatedItem.data?.productLinks ?? updatedItem.productLinks ?? [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,7 @@ import { BASE_PATH } from "@/lib/utils";
 type ShoppingList = {
   id: string;
   name: string;
+  refreshStatus?: string;
   categoryGroups: Array<{
     category: { id: string; name: string; order: number };
     items: Array<{
@@ -67,6 +68,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   const { toast } = useToast();
   const syncContext = useSync();
   const router = useRouter();
+  const pollingRef = useRef(false);
 
   const unwrapApiResult = (result: any) => result?.data ?? result;
   
@@ -125,52 +127,76 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     }
 
     setIsRefreshing(true);
+    pollingRef.current = true;
+    
     try {
       // Collect IDs of all active (non-completed) items
       const activeItemIds = shoppingList.categoryGroups
         .flatMap(group => group.items.map(item => item.groceryItemId));
 
-      // Start the refresh process - this waits until scraping is complete
+      // Start the refresh process in the background (returns immediately)
       const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groceryItemIds: activeItemIds }),
+        body: JSON.stringify({ 
+          groceryItemIds: activeItemIds,
+          shoppingListId: shoppingList.id 
+        }),
       });
 
-      if (!response.ok) throw new Error("Failed to refresh prices");
+      if (!response.ok) throw new Error("Failed to start price refresh");
 
-      // Refresh is complete, now fetch the updated shopping list data (force fresh)
-      try {
-        const updatedResponse = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`, {
-          method: 'GET',
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
-        });
+      // Poll for updates every 3 seconds
+      const pollInterval = 3000;
+      
+      const pollForUpdates = async () => {
+        if (!pollingRef.current) return;
+        
+        // Fetch updated shopping list data
+        try {
+          const updatedResponse = await fetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          });
 
-        if (updatedResponse.ok) {
-          const result = await updatedResponse.json();
-          const freshData = unwrapApiResult(result);
-          if (freshData) setShoppingList(freshData);
+          if (updatedResponse.ok) {
+            const result = await updatedResponse.json();
+            const freshData = unwrapApiResult(result);
+            if (freshData) {
+              setShoppingList(freshData);
+              
+              // Stop polling if refresh is complete
+              if (freshData.refreshStatus !== 'refreshing') {
+                pollingRef.current = false;
+                setIsRefreshing(false);
+                toast({
+                  title: "Success",
+                  description: "Prices refreshed successfully",
+                });
+                return;
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error polling for updates:", error);
         }
-      } catch (error) {
-        // Fallback: try the offline cache
-        const cached = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
-        const cachedData = unwrapApiResult(cached);
-        if (cachedData) setShoppingList(cachedData);
-      }
 
-      setIsRefreshing(false);
-      toast({
-        title: "Success",
-        description: "Prices refreshed successfully",
-      });
+        // Continue polling if still active
+        if (pollingRef.current) {
+          setTimeout(pollForUpdates, pollInterval);
+        }
+      };
 
+      // Start polling after initial delay
+      setTimeout(pollForUpdates, pollInterval);
     } catch (error) {
+      pollingRef.current = false;
       toast({
         title: "Error",
-        description: "Failed to refresh prices",
+        description: "Failed to start price refresh",
         variant: "destructive",
       });
       setIsRefreshing(false);
