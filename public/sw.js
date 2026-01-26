@@ -1,5 +1,5 @@
-const CACHE_NAME = 'mygroceries-v4';
-const RUNTIME_CACHE = 'mygroceries-runtime-v4';
+const CACHE_NAME = 'mygroceries-v5';
+const RUNTIME_CACHE = 'mygroceries-runtime-v5';
 const urlsToCache = [
   '/groceries/',
   '/groceries/manifest.json',
@@ -23,6 +23,9 @@ self.addEventListener('install', (event) => {
 // Fetch event - stale-while-revalidate for API, cache first for assets
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  
+  // Log all requests (can be noisy, comment out if needed)
+  // console.log('[SW] Intercepted:', event.request.method, url.pathname);
   
   // API GET routes - stale-while-revalidate
   if (url.pathname.startsWith('/groceries/api/') && event.request.method === 'GET') {
@@ -57,6 +60,36 @@ self.addEventListener('fetch', (event) => {
             headers: { 'Content-Type': 'application/json' }
           }
         );
+      })
+    );
+    return;
+  }
+  
+  // Images (including store icons) - cache first, long-term cache
+  if (event.request.destination === 'image' || url.pathname.includes('/store_icons/')) {
+    console.log('[SW] Image request:', url.pathname, 'Full URL:', event.request.url);
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
+          if (cachedResponse) {
+            console.log('[SW] ✓ Serving image from cache:', url.pathname);
+            return cachedResponse;
+          }
+          
+          console.log('[SW] ✗ Image not in cache, fetching:', url.pathname);
+          return fetch(event.request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              console.log('[SW] ✓ Caching image:', url.pathname);
+              cache.put(event.request, networkResponse.clone());
+            } else {
+              console.log('[SW] ✗ Image fetch failed or non-200:', url.pathname, networkResponse?.status);
+            }
+            return networkResponse;
+          }).catch((error) => {
+            console.error('[SW] ✗ Image fetch error:', url.pathname, error);
+            throw error;
+          });
+        });
       })
     );
     return;

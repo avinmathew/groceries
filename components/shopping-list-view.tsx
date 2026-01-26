@@ -65,8 +65,12 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [shoppingList, setShoppingList] = useState(initialShoppingList);
   const { toast } = useToast();
-  const { isOnline, sync } = useSync();
+  const syncContext = useSync();
   const router = useRouter();
+  
+  // Only destructure what we need when we need it to avoid re-renders
+  const isOnline = syncContext.isOnline;
+  const sync = syncContext.sync;
 
   // Load from cache on mount
   useEffect(() => {

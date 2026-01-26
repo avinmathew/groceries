@@ -98,6 +98,13 @@ export function SyncProvider({ children }: SyncProviderProps) {
       console.log('Sync skipped - offline or already syncing');
       return { success: 0, failed: 0, errors: [] };
     }
+    
+    // Quick check: if there are no pending mutations, skip the expensive sync
+    const count = await offlineDB.pendingMutations.count();
+    if (count === 0) {
+      console.log('Sync skipped - no pending mutations');
+      return { success: 0, failed: 0, errors: [] };
+    }
 
     setIsSyncing(true);
     console.log('Starting sync...');
