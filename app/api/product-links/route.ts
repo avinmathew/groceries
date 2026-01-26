@@ -5,7 +5,9 @@ export async function POST(request: Request) {
   try {
     const { url, store, groceryItemId } = await request.json();
 
-    if (!url || !store || !groceryItemId) {
+    const trimmedUrl = typeof url === "string" ? url.trim() : "";
+
+    if (!trimmedUrl || !store || !groceryItemId) {
       return NextResponse.json(
         { error: "url, store, and groceryItemId are required" },
         { status: 400 }
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
 
     const productLink = await prisma.productLink.create({
       data: {
-        url,
+        url: trimmedUrl,
         store,
         groceryItemId,
       },

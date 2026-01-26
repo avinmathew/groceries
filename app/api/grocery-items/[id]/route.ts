@@ -57,7 +57,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const updateData: any = {};
     if (quantity !== undefined) updateData.quantity = quantity;
-    if (notes !== undefined) updateData.notes = notes;
+    if (notes !== undefined) updateData.notes = typeof notes === "string" ? notes.trim() || null : notes;
     if (isCompleted !== undefined) {
       updateData.isCompleted = isCompleted;
       updateData.completedAt = isCompleted ? new Date() : null;
@@ -80,7 +80,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     // If name or categoryId changed, update the underlying grocery item
     if (name !== undefined || categoryId !== undefined) {
       const groceryUpdateData: any = {};
-      if (name !== undefined) groceryUpdateData.name = name;
+      if (name !== undefined) groceryUpdateData.name = typeof name === "string" ? name.trim() : name;
       if (categoryId !== undefined) groceryUpdateData.categoryId = categoryId || null;
       
       await prisma.groceryItem.update({

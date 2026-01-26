@@ -25,7 +25,9 @@ export async function POST(request: Request) {
   try {
     const { name } = await request.json();
 
-    if (!name || typeof name !== "string") {
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+
+    if (!trimmedName) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
@@ -37,7 +39,7 @@ export async function POST(request: Request) {
 
     const category = await prisma.category.create({
       data: {
-        name,
+        name: trimmedName,
         order: (maxOrder?.order ?? -1) + 1,
       },
     });

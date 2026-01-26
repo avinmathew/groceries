@@ -5,10 +5,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const { name, order } = await request.json();
 
+    const trimmedName = typeof name === "string" ? name.trim() : name;
+
     const category = await prisma.category.update({
       where: { id: params.id },
       data: {
-        ...(name && { name }),
+        ...(trimmedName && { name: trimmedName }),
         ...(order !== undefined && { order }),
       },
     });

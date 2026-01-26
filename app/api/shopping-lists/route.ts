@@ -33,13 +33,15 @@ export async function POST(request: Request) {
   try {
     const { name } = await request.json();
 
-    if (!name || typeof name !== "string") {
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+
+    if (!trimmedName) {
       return validationError("Name is required");
     }
 
     const shoppingList = await prisma.shoppingList.create({
       data: {
-        name,
+        name: trimmedName,
       },
     });
 

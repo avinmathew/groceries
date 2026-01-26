@@ -167,10 +167,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const { name } = await request.json();
 
+    const trimmedName = typeof name === "string" ? name.trim() : name;
+
     const shoppingList = await prisma.shoppingList.update({
       where: { id: params.id },
       data: {
-        ...(name && { name }),
+        ...(trimmedName && { name: trimmedName }),
       },
     });
 
