@@ -1,21 +1,30 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { GroceryItemEditView } from "@/components/grocery-item-edit-view";
+import { unstable_noStore } from "next/cache";
+
+// Force dynamic rendering and disable request caching
+export const dynamic = 'force-dynamic';
 
 async function getGroceryItem(id: string) {
-  const item = await prisma.shoppingListItem.findUnique({
-    where: { id },
-    include: {
-      groceryItem: {
-        include: {
-          category: true,
-          productLinks: true,
-          shoppingListItems: true,
+  // Disable request cache to ensure fresh data on every load
+  unstable_noStore();
+  
+  const item = await prisma.shoppingListItem.findUnique(
+    {
+      where: { id },
+      include: {
+        groceryItem: {
+          include: {
+            category: true,
+            productLinks: true,
+            shoppingListItems: true,
+          },
         },
+        shoppingList: true,
       },
-      shoppingList: true,
     },
-  });
+  );
 
   if (!item) return null;
 

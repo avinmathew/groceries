@@ -183,6 +183,24 @@ export function GroceryItemEditView({
   const router = useRouter();
   const { toast } = useToast();
 
+  const refreshProductLinks = useCallback(async () => {
+    try {
+      const response = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.groceryItemId}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      });
+
+      if (!response.ok) return;
+      const data = await response.json();
+      const refreshedLinks = data.data?.productLinks ?? data.productLinks ?? [];
+      setProductLinks(refreshedLinks);
+    } catch (error) {
+      console.error("Error refreshing product links:", error);
+    }
+  }, [initialItem.groceryItemId]);
+
   const loadPriceHistory = useCallback(async () => {
     setIsLoadingHistory(true);
     try {
@@ -202,6 +220,29 @@ export function GroceryItemEditView({
   useEffect(() => {
     loadPriceHistory();
   }, [loadPriceHistory]);
+
+  // Ensure product links refresh when returning to the page
+  useEffect(() => {
+    refreshProductLinks();
+
+    const handleFocus = () => {
+      refreshProductLinks();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshProductLinks();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [refreshProductLinks]);
 
   const saveField = useCallback(async (fieldData?: Partial<{name: string; quantity: number; notes: string; categoryId: string}>) => {
     // Prepare the data to save
