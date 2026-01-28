@@ -55,6 +55,9 @@ Add item dialog shows all items, ordered by most added.
 The text box allows a user to create a new item or filter existing items.
 If the item is already on a shopping list, it is shown underneath in grey text, similar to the Notes on the grocery item row with the text "On [Shopping List]".
 The dialog can be full screen on a mobile display.
+When adding a new item, it sets the quantity to one.
+When adding an existing item already on the list, it increases the quantity by one.
+When adding an existing crossed-off item, it is added to the list with no change in quantity.
 
 ## Edit Grocery view
 

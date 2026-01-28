@@ -125,6 +125,177 @@ describe('POST /api/grocery-items', () => {
     expect(response.status).toBe(500);
     expect(data.error).toContain('Failed to add item to shopping list');
   });
+
+  it('should set quantity to 1 when adding a new item', async () => {
+    const mockGrocery = {
+      id: 'g1',
+      name: 'New Item',
+      category: null,
+      productLinks: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockShoppingListItem = {
+      id: 'sli1',
+      quantity: 1,
+      isCompleted: false,
+      shoppingListId: 'list1',
+      groceryItemId: 'g1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      groceryItem: mockGrocery,
+    } as any;
+
+    mockPrisma.groceryItem.findFirst.mockResolvedValue(null);
+    mockPrisma.groceryItem.create.mockResolvedValue(mockGrocery as any);
+    mockPrisma.shoppingListItem.findFirst.mockResolvedValue(null);
+    mockPrisma.shoppingListItem.create.mockResolvedValue(mockShoppingListItem as any);
+
+    const request = new NextRequest('http://localhost:3000/api/grocery-items', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'New Item', shoppingListId: 'list1' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(mockPrisma.shoppingListItem.create).toHaveBeenCalledWith({
+      data: {
+        groceryItemId: 'g1',
+        shoppingListId: 'list1',
+        quantity: 1,
+      },
+      include: {
+        groceryItem: {
+          include: {
+            category: true,
+            productLinks: true,
+          },
+        },
+      },
+    });
+  });
+
+  it('should increase quantity by 1 when adding an existing uncrossed item', async () => {
+    const mockGrocery = {
+      id: 'g1',
+      name: 'Existing Item',
+      category: null,
+      productLinks: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const existingShoppingListItem = {
+      id: 'sli1',
+      quantity: 2,
+      isCompleted: false,
+      completedAt: null,
+      shoppingListId: 'list1',
+      groceryItemId: 'g1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const updatedShoppingListItem = {
+      ...existingShoppingListItem,
+      quantity: 3,
+      groceryItem: mockGrocery,
+    } as any;
+
+    mockPrisma.groceryItem.findFirst.mockResolvedValue(mockGrocery as any);
+    mockPrisma.shoppingListItem.findFirst.mockResolvedValue(existingShoppingListItem as any);
+    mockPrisma.shoppingListItem.update.mockResolvedValue(updatedShoppingListItem as any);
+
+    const request = new NextRequest('http://localhost:3000/api/grocery-items', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Existing Item', shoppingListId: 'list1' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(mockPrisma.shoppingListItem.update).toHaveBeenCalledWith({
+      where: { id: 'sli1' },
+      data: {
+        isCompleted: false,
+        completedAt: null,
+        quantity: 3,
+      },
+      include: {
+        groceryItem: {
+          include: {
+            category: true,
+            productLinks: true,
+          },
+        },
+      },
+    });
+    expect(data.data.quantity).toBe(3);
+  });
+
+  it('should not change quantity when adding an existing crossed-off item', async () => {
+    const mockGrocery = {
+      id: 'g1',
+      name: 'Crossed Off Item',
+      category: null,
+      productLinks: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const existingShoppingListItem = {
+      id: 'sli1',
+      quantity: 3,
+      isCompleted: true,
+      completedAt: new Date(),
+      shoppingListId: 'list1',
+      groceryItemId: 'g1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const updatedShoppingListItem = {
+      ...existingShoppingListItem,
+      isCompleted: false,
+      completedAt: null,
+      groceryItem: mockGrocery,
+    } as any;
+
+    mockPrisma.groceryItem.findFirst.mockResolvedValue(mockGrocery as any);
+    mockPrisma.shoppingListItem.findFirst.mockResolvedValue(existingShoppingListItem as any);
+    mockPrisma.shoppingListItem.update.mockResolvedValue(updatedShoppingListItem as any);
+
+    const request = new NextRequest('http://localhost:3000/api/grocery-items', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Crossed Off Item', shoppingListId: 'list1' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(mockPrisma.shoppingListItem.update).toHaveBeenCalledWith({
+      where: { id: 'sli1' },
+      data: {
+        isCompleted: false,
+        completedAt: null,
+      },
+      include: {
+        groceryItem: {
+          include: {
+            category: true,
+            productLinks: true,
+          },
+        },
+      },
+    });
+    // Quantity should remain 3, not incremented
+    expect(data.data.quantity).toBe(3);
+  });
 });
 
 describe('GET /api/grocery-items/[id]', () => {

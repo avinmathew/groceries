@@ -46,14 +46,23 @@ export async function POST(request: Request) {
     let shoppingListItem;
 
     if (existingShoppingListItem) {
-      // If item exists on this list, revive if completed and increment quantity by requested amount
+      // Determine update logic based on completion status:
+      // - If crossed off (completed): uncross without changing quantity
+      // - If not crossed off: increment quantity by requested amount
+      const updateData: any = {
+        isCompleted: false,
+        completedAt: null,
+      };
+
+      if (!existingShoppingListItem.isCompleted) {
+        // Item is already on the list and not crossed off - increment quantity
+        updateData.quantity = (existingShoppingListItem.quantity ?? 0) + (quantity ?? 1);
+      }
+      // If crossed off, keep existing quantity (no change)
+
       shoppingListItem = await prisma.shoppingListItem.update({
         where: { id: existingShoppingListItem.id },
-        data: {
-          isCompleted: false,
-          completedAt: null,
-          quantity: (existingShoppingListItem.quantity ?? 0) + (quantity ?? 1),
-        },
+        data: updateData,
         include: {
           groceryItem: {
             include: {
