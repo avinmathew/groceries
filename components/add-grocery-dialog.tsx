@@ -40,7 +40,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { isOnline, sync } = useSync();
+  const { isOnline, sync, updatePendingCount } = useSync();
 
   useEffect(() => {
     // Fetch all existing groceries for autocomplete
@@ -111,6 +111,9 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
       
       if (isOnline) {
         await sync();
+      } else {
+        // Update pending count to show badge when offline
+        await updatePendingCount();
       }
       
       toast({

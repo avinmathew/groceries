@@ -123,6 +123,36 @@ pm2 start npm --name "groceries" -- start
 - **Linting**: `npm run lint` - Run ESLint
 - **Type Checking**: TypeScript is checked during build
 
+## Testing
+
+### Unit/Integration (Jest)
+
+Install dependencies (already covered in Installation), then run:
+
+```bash
+npm test
+```
+
+### E2E (Playwright)
+
+Playwright requires browser binaries (one-time install):
+
+```bash
+npx playwright install
+```
+
+Run E2E tests:
+
+```bash
+npm run test:e2e
+```
+
+Optional: run all tests (Jest then Playwright):
+
+```bash
+npm run test:all
+```
+
 ## License
 
 MIT

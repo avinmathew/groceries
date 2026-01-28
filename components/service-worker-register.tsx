@@ -5,6 +5,9 @@ import { BASE_PATH } from '@/lib/utils';
 
 export function ServiceWorkerRegister() {
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DISABLE_SW === '1' || process.env.NEXT_PUBLIC_DISABLE_SW === 'true') {
+      return;
+    }
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register(`${BASE_PATH}/sw.js`)

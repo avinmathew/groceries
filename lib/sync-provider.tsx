@@ -12,6 +12,7 @@ interface SyncContextType {
   pendingCount: number;
   sync: () => Promise<FlushResult>;
   forceRefresh: () => Promise<void>;
+  updatePendingCount: () => Promise<void>;
 }
 
 const SyncContext = createContext<SyncContextType | null>(null);
@@ -244,6 +245,7 @@ export function SyncProvider({ children }: SyncProviderProps) {
     pendingCount,
     sync,
     forceRefresh,
+    updatePendingCount,
   };
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

@@ -14,6 +14,11 @@ const customJestConfig = {
   },
   transformIgnorePatterns: [
     'node_modules/(?!(cheerio)/)'
+  ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/e2e/',
+    '\\.spec\\.ts$'
   ]
 }
 

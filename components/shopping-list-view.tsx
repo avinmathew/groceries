@@ -100,18 +100,21 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
       if (response.ok) {
         const result = await response.json();
         const freshData = result?.data || result;
-        setShoppingList(freshData);
+        if (freshData && freshData.categoryGroups) {
+          setShoppingList(freshData);
+        }
       }
     } catch (error) {
       console.error("Failed to refresh shopping list after item added:", error);
       // Fallback: try the offline cache
       try {
         const cachedResponse = await offlineFetch(`${BASE_PATH}/api/shopping-lists/${shoppingList.id}`);
-        if (cachedResponse?.data) {
+        if (cachedResponse?.data && cachedResponse.data.categoryGroups) {
           setShoppingList(cachedResponse.data);
         }
       } catch (cacheError) {
         console.error("Cache fallback also failed:", cacheError);
+        // Keep the existing shoppingList state - don't corrupt it
       }
     }
   };
@@ -365,7 +368,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
               variant="ghost"
               size="icon"
               onClick={handleRefreshPrices}
-              disabled={isRefreshing || !shoppingList || !shoppingList.categoryGroups.some(g => g.items.length > 0)}
+              disabled={isRefreshing || !shoppingList || !shoppingList.categoryGroups || !shoppingList.categoryGroups.some(g => g.items.length > 0)}
             >
               <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
@@ -382,7 +385,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
       </header>
 
       <main className="container mx-auto">
-        {!shoppingList ? (
+        {!shoppingList || !shoppingList.categoryGroups ? (
           <div className="flex justify-center items-center h-64">
             <div>Loading...</div>
           </div>
@@ -424,7 +427,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
             </div>
 
             {/* Crossed Off Section */}
-            {shoppingList.completedItems.length > 0 && (
+            {shoppingList.completedItems && shoppingList.completedItems.length > 0 && (
               <div className="pt-6">
                 <div className="sticky top-[56px] z-5 bg-brand-dark px-2 py-1">
                   <h2 className="text-sm text-white font-semibold">Crossed off</h2>
