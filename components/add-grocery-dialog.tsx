@@ -150,27 +150,47 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
           autoFocus
           autoCapitalize="none"
           onKeyDown={(e) => {
-            if (e.key === "Enter" && filteredGroceries.length === 0 && searchQuery.trim()) {
-              handleCreateNew();
+            if (e.key === "Enter" && searchQuery.trim()) {
+              const exactMatch = filteredGroceries.find(
+                (g) => g.name.toLowerCase() === searchQuery.trim().toLowerCase()
+              );
+              if (exactMatch) {
+                handleSelectGrocery(exactMatch.name);
+              } else {
+                handleCreateNew();
+              }
             }
           }}
         />
         <div className="mt-2 max-h-[60vh] overflow-y-auto space-y-1">
           {filteredGroceries.length > 0 ? (
-            filteredGroceries.map((grocery, index) => (
-              <button
-                key={`${grocery.name}-${index}`}
-                onClick={() => handleSelectGrocery(grocery.name)}
-                className="w-full text-left px-3 py-2 rounded hover:bg-accent"
-              >
-                <span className="font-medium">{grocery.name}</span>
-                {grocery.shoppingLists.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    On {grocery.shoppingLists.map((list) => list.name).join(", ")}
-                  </p>
-                )}
-              </button>
-            ))
+            <>
+              {filteredGroceries.map((grocery, index) => (
+                <button
+                  key={`${grocery.name}-${index}`}
+                  onClick={() => handleSelectGrocery(grocery.name)}
+                  className="w-full text-left px-3 py-2 rounded hover:bg-accent"
+                >
+                  <span className="font-medium">{grocery.name}</span>
+                  {grocery.shoppingLists.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      On {grocery.shoppingLists.map((list) => list.name).join(", ")}
+                    </p>
+                  )}
+                </button>
+              ))}
+              {searchQuery.trim() && !filteredGroceries.some(
+                (g) => g.name.toLowerCase() === searchQuery.trim().toLowerCase()
+              ) && (
+                <button
+                  onClick={handleCreateNew}
+                  disabled={isLoading}
+                  className="w-full text-left px-3 py-2 rounded hover:bg-accent mt-2"
+                >
+                  Create &quot;{searchQuery}&quot;
+                </button>
+              )}
+            </>
           ) : searchQuery.trim() ? (
             <button
               onClick={handleCreateNew}
