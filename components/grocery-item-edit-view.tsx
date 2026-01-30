@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, RefreshCw } from "lucide-react";
+import Image from "next/image";
+import { ArrowLeft, Plus, Trash2, RefreshCw, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,10 +35,14 @@ type ProductLink = {
   id: string;
   url: string;
   store: string;
+  label?: string | null;
+  perUnit?: number | null;
   regularPrice: number | null;
   discountPrice: number | null;
   lastRefreshed: string | null;
 };
+
+type StoreKey = "woolworths" | "coles" | "aldi";
 
 type PriceHistoryEntry = {
   id: string;
@@ -64,39 +69,73 @@ type GroceryItem = {
   shoppingListCount?: number;
 };
 
-function CombinedPriceHistoryTable({ priceHistory }: { priceHistory: PriceHistoryEntry[] }) {
-  // Group price history by date (day level, ignoring time)
-  type DayData = { date: string; stores: Record<string, number[]> };
-  const groupedByDate = priceHistory.reduce((acc: Record<string, DayData>, entry) => {
-    const date = new Date(entry.recordedAt);
-    const dateKey = date.toISOString().split("T")[0]; // YYYY-MM-DD format
-    
-    if (!acc[dateKey]) {
-      acc[dateKey] = {
-        date: dateKey,
-        stores: {} as Record<string, number[]>,
+const STORE_DISPLAY_NAMES: Record<StoreKey, string> = {
+  woolworths: "Woolworths",
+  coles: "Coles",
+  aldi: "Aldi",
+};
+
+function PriceHistoryMatrixTable({
+  productLinks,
+  priceHistory,
+}: {
+  productLinks: ProductLink[];
+  priceHistory: PriceHistoryEntry[];
+}) {
+  const storesInLinks = useMemo(() => {
+    return new Set(productLinks.map((l) => l.store.toLowerCase()));
+  }, [productLinks]);
+
+  const showStoreIcon = storesInLinks.size > 1;
+
+  const linkColumns = useMemo(() => {
+    return productLinks.map((link) => {
+      const trimmedLabel = typeof link.label === "string" ? link.label.trim() : "";
+      const storeKey = link.store.toLowerCase() as StoreKey;
+      const storeName = STORE_DISPLAY_NAMES[storeKey] ?? link.store;
+      const title = trimmedLabel || storeName;
+
+      return {
+        id: link.id,
+        storeLower: link.store.toLowerCase(),
+        storeName,
+        title,
       };
-    }
-    
-    const store = entry.store.toLowerCase();
-    const price = entry.discountPrice || entry.regularPrice;
-    
-    if (price !== null) {
-      if (!acc[dateKey].stores[store]) {
-        acc[dateKey].stores[store] = [];
+    });
+  }, [productLinks]);
+
+  const groupedByDay = useMemo(() => {
+    const dayMap = new Map<string, Map<string, PriceHistoryEntry>>();
+
+    for (const entry of priceHistory) {
+      const dateKey = new Date(entry.recordedAt).toISOString().split("T")[0];
+
+      if (!dayMap.has(dateKey)) dayMap.set(dateKey, new Map());
+      const linksForDay = dayMap.get(dateKey)!;
+
+      const existing = linksForDay.get(entry.productLinkId);
+      if (!existing) {
+        linksForDay.set(entry.productLinkId, entry);
+        continue;
       }
-      acc[dateKey].stores[store].push(price);
+
+      if (new Date(entry.recordedAt).getTime() > new Date(existing.recordedAt).getTime()) {
+        linksForDay.set(entry.productLinkId, entry);
+      }
     }
-    
-    return acc;
-  }, {} as Record<string, DayData>);
 
-  // Convert to array and sort by date (newest first)
-  const sortedDates = Object.values(groupedByDate).sort((a: DayData, b: DayData) => 
-    new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+    return dayMap;
+  }, [priceHistory]);
 
-  const formatDate = (dateString: string) => {
+  const sortedDays = useMemo(() => {
+    return [...groupedByDay.keys()].sort(
+      (a, b) => new Date(b).getTime() - new Date(a).getTime(),
+    );
+  }, [groupedByDay]);
+
+  if (sortedDays.length === 0) return null;
+
+  const formatDay = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
       month: "short",
@@ -105,51 +144,59 @@ function CombinedPriceHistoryTable({ priceHistory }: { priceHistory: PriceHistor
     });
   };
 
-  const formatPriceRange = (prices: number[]): string => {
-    if (prices.length === 0) return "-";
-    if (prices.length === 1) return `$${prices[0].toFixed(2)}`;
-    
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    
-    if (min === max) {
-      return `$${min.toFixed(2)}`;
-    }
-    
-    return `$${min.toFixed(2)} - $${max.toFixed(2)}`;
-  };
-
-  const getPriceForStore = (stores: Record<string, number[]>, storeName: string): string => {
-    const prices = stores[storeName.toLowerCase()];
-    return prices ? formatPriceRange(prices) : "-";
-  };
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="border-b">
-            <th className="text-left p-3 font-semibold">Date</th>
-            <th className="text-right p-3 font-semibold">Woolworths</th>
-            <th className="text-right p-3 font-semibold">Coles</th>
-            <th className="text-right p-3 font-semibold">Aldi</th>
+            <th className="text-left p-3 font-semibold whitespace-nowrap">Date</th>
+            {linkColumns.map((col) => (
+              <th key={col.id} className="text-right p-3 font-semibold whitespace-nowrap">
+                <div className="flex items-center justify-end gap-2">
+                  {showStoreIcon ? (
+                    <Image
+                      src={`/store_icons/${col.storeLower}.webp`}
+                      alt={col.storeName}
+                      width={16}
+                      height={16}
+                      className="object-contain"
+                      loading="eager"
+                    />
+                  ) : null}
+                  <div className="flex flex-col items-end">
+                    <span title={col.title}>{col.title}</span>
+                  </div>
+                </div>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {sortedDates.map((dayData: DayData) => (
-            <tr key={dayData.date} className="border-b hover:bg-muted/50">
-              <td className="p-3">{formatDate(dayData.date)}</td>
-              <td className="text-right p-3">
-                {getPriceForStore(dayData.stores, "woolworths")}
-              </td>
-              <td className="text-right p-3">
-                {getPriceForStore(dayData.stores, "coles")}
-              </td>
-              <td className="text-right p-3">
-                {getPriceForStore(dayData.stores, "aldi")}
-              </td>
-            </tr>
-          ))}
+          {sortedDays.map((day) => {
+            const linksForDay = groupedByDay.get(day) ?? new Map<string, PriceHistoryEntry>();
+
+            return (
+              <tr key={day} className="border-b hover:bg-muted/50">
+                <td className="p-3 whitespace-nowrap">{formatDay(day)}</td>
+                {linkColumns.map((col) => {
+                  const entry = linksForDay.get(col.id);
+                  const effective = entry ? entry.discountPrice ?? entry.regularPrice : null;
+
+                  return (
+                    <td key={col.id} className="p-3 text-right whitespace-nowrap">
+                      {effective === null ? (
+                        "-"
+                      ) : entry && entry.discountPrice !== null ? (
+                        <Badge className="bg-discount text-black">${entry.discountPrice.toFixed(2)}</Badge>
+                      ) : (
+                        <span>${effective.toFixed(2)}</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -169,8 +216,13 @@ export function GroceryItemEditView({
   // Use "uncategorised" as a special value instead of empty string for Select
   const [categoryId, setCategoryId] = useState(initialItem.categoryId || "uncategorised");
   const [productLinks, setProductLinks] = useState(initialItem.productLinks);
-  const [newLinkUrl, setNewLinkUrl] = useState("");
-  const [newLinkStore, setNewLinkStore] = useState<"woolworths" | "coles" | "aldi">("woolworths");
+  const [productLinkDialogMode, setProductLinkDialogMode] = useState<"create" | "edit" | null>(null);
+  const [productLinkDialogLink, setProductLinkDialogLink] = useState<ProductLink | null>(null);
+  const [productLinkUrl, setProductLinkUrl] = useState("");
+  const [productLinkLabel, setProductLinkLabel] = useState("");
+  const [productLinkPerUnit, setProductLinkPerUnit] = useState("");
+  const [productLinkStore, setProductLinkStore] = useState<StoreKey>("woolworths");
+  const [isSavingProductLink, setIsSavingProductLink] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -182,6 +234,66 @@ export function GroceryItemEditView({
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const router = useRouter();
   const { toast } = useToast();
+
+  const perUnitBase = useMemo(() => {
+    const perUnits = productLinks
+      .map((link) => link.perUnit)
+      .filter((value): value is number => typeof value === "number" && value > 0);
+
+    if (!perUnits.length) return null;
+
+    const minUnit = Math.min(...perUnits);
+    const exponent = Math.floor(Math.log10(minUnit));
+    return Math.pow(10, exponent);
+  }, [productLinks]);
+
+  const getPerUnitDisplay = (link: ProductLink) => {
+    if (!perUnitBase || !link.perUnit || link.perUnit <= 0) return null;
+    const price = link.discountPrice ?? link.regularPrice;
+    if (price === null) return null;
+    const normalizedPrice = (price / link.perUnit) * perUnitBase;
+    return `$${normalizedPrice.toFixed(2)}/${perUnitBase}`;
+  };
+
+  const getProductLinkDisplayName = (link: ProductLink) => {
+    const trimmedLabel = typeof link.label === "string" ? link.label.trim() : "";
+    if (trimmedLabel) return trimmedLabel;
+
+    const storeKey = link.store.toLowerCase() as StoreKey;
+    return STORE_DISPLAY_NAMES[storeKey] ?? link.store;
+  };
+
+  const closeProductLinkDialog = () => {
+    setProductLinkDialogMode(null);
+    setProductLinkDialogLink(null);
+    setProductLinkUrl("");
+    setProductLinkLabel("");
+    setProductLinkPerUnit("");
+    setProductLinkStore("woolworths");
+    setIsSavingProductLink(false);
+  };
+
+  const openCreateProductLinkDialog = () => {
+    setProductLinkDialogMode("create");
+    setProductLinkDialogLink(null);
+    setProductLinkUrl("");
+    setProductLinkLabel("");
+    setProductLinkPerUnit("");
+    setProductLinkStore("woolworths");
+  };
+
+  const openEditProductLinkDialog = (link: ProductLink) => {
+    const storeValue: StoreKey = ("woolworths" === link.store || "coles" === link.store || "aldi" === link.store)
+      ? (link.store as StoreKey)
+      : "woolworths";
+
+    setProductLinkDialogMode("edit");
+    setProductLinkDialogLink(link);
+    setProductLinkUrl(link.url);
+    setProductLinkLabel(link.label ?? "");
+    setProductLinkPerUnit(link.perUnit !== null && link.perUnit !== undefined ? String(link.perUnit) : "");
+    setProductLinkStore(storeValue);
+  };
 
   const refreshProductLinks = useCallback(async () => {
     try {
@@ -286,35 +398,127 @@ export function GroceryItemEditView({
     }
   }, [initialItem.id, toast, router, name, quantity, notes, categoryId]);
 
-  const handleAddLink = async () => {
-    if (!newLinkUrl.trim()) return;
+  const handleUpdateLink = async (
+    linkId: string,
+    updates: { url?: string; label?: string | null; perUnit?: number | null }
+  ): Promise<boolean> => {
+    const existing = productLinks.find((link) => link.id === linkId);
+    if (!existing) return false;
+
+    const normalizedUpdates: { url?: string; label?: string | null; perUnit?: number | null } = {};
+
+    if (updates.url !== undefined) {
+      const trimmedUrl = updates.url.trim();
+      if (!trimmedUrl) {
+        toast({
+          title: "URL required",
+          description: "Please enter a product URL",
+          variant: "destructive",
+        });
+        return false;
+      }
+      normalizedUpdates.url = trimmedUrl;
+    }
+
+    if (updates.label !== undefined) {
+      const trimmedLabel = typeof updates.label === "string" ? updates.label.trim() : updates.label;
+      normalizedUpdates.label = trimmedLabel || null;
+    }
+
+    if (updates.perUnit !== undefined) {
+      if (updates.perUnit !== null && (updates.perUnit <= 0 || !Number.isFinite(updates.perUnit))) {
+        toast({
+          title: "Invalid per-unit value",
+          description: "Per unit must be a positive number",
+          variant: "destructive",
+        });
+        return false;
+      }
+      normalizedUpdates.perUnit = updates.perUnit;
+    }
+
+    try {
+      const response = await fetch(`${BASE_PATH}/api/product-links/${linkId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(normalizedUpdates),
+      });
+
+      if (!response.ok) throw new Error("Failed to update product link");
+
+      const updatedLink = await response.json();
+      setProductLinks((prev) => prev.map((link) => (link.id === updatedLink.id ? updatedLink : link)));
+      return true;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update product link",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const handleAddLink = async (args: {
+    url: string;
+    store: StoreKey;
+    label: string;
+    perUnit: string;
+  }): Promise<boolean> => {
+    const trimmedUrl = args.url.trim();
+    if (!trimmedUrl) {
+      toast({
+        title: "URL required",
+        description: "Please enter a product URL",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const trimmedLabel = args.label.trim();
+    let parsedPerUnit: number | null = null;
+    if (args.perUnit.trim() !== "") {
+      const numericPerUnit = Number(args.perUnit);
+      if (!Number.isFinite(numericPerUnit) || numericPerUnit <= 0) {
+        toast({
+          title: "Invalid per-unit value",
+          description: "Per unit must be a positive number",
+          variant: "destructive",
+        });
+        return false;
+      }
+      parsedPerUnit = numericPerUnit;
+    }
 
     try {
       const response = await fetch(`${BASE_PATH}/api/product-links`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url: newLinkUrl.trim(),
-          store: newLinkStore,
+          url: trimmedUrl,
+          store: args.store,
           groceryItemId: initialItem.groceryItemId,
+          label: trimmedLabel || null,
+          perUnit: parsedPerUnit,
         }),
       });
 
       if (!response.ok) throw new Error("Failed to add product link");
 
       const newLink = await response.json();
-      setProductLinks([...productLinks, newLink]);
-      setNewLinkUrl("");
+      setProductLinks((prev) => [...prev, newLink]);
       toast({
         title: "Success",
         description: "Product link added",
       });
+      return true;
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to add product link",
         variant: "destructive",
       });
+      return false;
     }
   };
 
@@ -596,113 +800,126 @@ export function GroceryItemEditView({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium">Product Links</label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRefreshPrices}
-                disabled={isRefreshing}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-                Refresh Prices
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={openCreateProductLinkDialog}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Link
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefreshPrices}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+                  Refresh Prices
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
-              {productLinks.map((link) => (
-                <div
-                  key={link.id}
-                  className="flex items-center gap-2 rounded-lg border p-3"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium capitalize">{link.store}</span>
-                      {link.discountPrice ? (
-                        <>
+              {productLinks.map((link) => {
+                const perUnitDisplay = getPerUnitDisplay(link);
+                const displayName = getProductLinkDisplayName(link);
+                const storeLower = link.store.toLowerCase();
+
+                return (
+                  <div
+                    key={link.id}
+                    className="flex items-center gap-2 rounded-lg border p-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Image
+                          src={`/store_icons/${storeLower}.webp`}
+                          alt={link.store}
+                          width={20}
+                          height={20}
+                          className="object-contain"
+                          loading="eager"
+                        />
+                        {displayName ? <span className="font-medium">{displayName}</span> : null}
+                        {link.discountPrice ? (
+                          <>
+                            <Badge 
+                              className="bg-discount text-black cursor-pointer hover:opacity-80"
+                              onClick={() => {
+                                setPriceToDelete({ linkId: link.id, priceType: 'discount', store: link.store });
+                                setShowDeletePriceDialog(true);
+                              }}
+                              title="Click to delete this price"
+                            >
+                              ${link.discountPrice.toFixed(2)}
+                            </Badge>
+                            <span 
+                              className="text-sm text-muted-foreground line-through cursor-pointer hover:opacity-80"
+                              onClick={() => {
+                                setPriceToDelete({ linkId: link.id, priceType: 'regular', store: link.store });
+                                setShowDeletePriceDialog(true);
+                              }}
+                              title="Click to delete this price"
+                            >
+                              ${link.regularPrice?.toFixed(2)}
+                            </span>
+                          </>
+                        ) : link.regularPrice ? (
                           <Badge 
-                            className="bg-discount text-black cursor-pointer hover:opacity-80"
-                            onClick={() => {
-                              setPriceToDelete({ linkId: link.id, priceType: 'discount', store: link.store });
-                              setShowDeletePriceDialog(true);
-                            }}
-                            title="Click to delete this price"
-                          >
-                            ${link.discountPrice.toFixed(2)}
-                          </Badge>
-                          <span 
-                            className="text-sm text-muted-foreground line-through cursor-pointer hover:opacity-80"
+                            variant="secondary" 
+                            className="cursor-pointer hover:opacity-80"
                             onClick={() => {
                               setPriceToDelete({ linkId: link.id, priceType: 'regular', store: link.store });
                               setShowDeletePriceDialog(true);
                             }}
                             title="Click to delete this price"
                           >
-                            ${link.regularPrice?.toFixed(2)}
+                            ${link.regularPrice.toFixed(2)}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">No price</Badge>
+                        )}
+                        {perUnitDisplay && (
+                          <span className="text-xs text-muted-foreground">
+                            {perUnitDisplay}
                           </span>
-                        </>
-                      ) : link.regularPrice ? (
-                        <Badge 
-                          variant="secondary" 
-                          className="cursor-pointer hover:opacity-80"
-                          onClick={() => {
-                            setPriceToDelete({ linkId: link.id, priceType: 'regular', store: link.store });
-                            setShowDeletePriceDialog(true);
-                          }}
-                          title="Click to delete this price"
-                        >
-                          ${link.regularPrice.toFixed(2)}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">No price</Badge>
-                      )}
-                      {link.lastRefreshed && (link.regularPrice !== null || link.discountPrice !== null) && (
-                        <span className="text-xs text-muted-foreground">
-                          {(() => {
-                            const daysAgo = Math.floor((Date.now() - new Date(link.lastRefreshed).getTime()) / (1000 * 60 * 60 * 24));
-                            return daysAgo === 0 ? 'today' : `${daysAgo} days ago`;
-                          })()}
-                        </span>
-                      )}
+                        )}
+                        {link.lastRefreshed && (link.regularPrice !== null || link.discountPrice !== null) && (
+                          <span className="text-xs text-muted-foreground">
+                            {(() => {
+                              const daysAgo = Math.floor((Date.now() - new Date(link.lastRefreshed).getTime()) / (1000 * 60 * 60 * 24));
+                              return daysAgo === 0 ? 'today' : `${daysAgo} days ago`;
+                            })()}
+                          </span>
+                        )}
+                      </div>
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-muted-foreground hover:underline block truncate"
+                        title={link.url}
+                      >
+                        {link.url}
+                      </a>
                     </div>
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-muted-foreground hover:underline block truncate"
-                      title={link.url}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditProductLinkDialog(link)}
+                      className="flex-shrink-0"
+                      title="Edit product link"
                     >
-                      {link.url}
-                    </a>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteLink(link.id)}
+                      className="flex-shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteLink(link.id)}
-                    className="flex-shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 mt-2">
-              <Input
-                value={newLinkUrl}
-                onChange={(e) => setNewLinkUrl(e.target.value)}
-                placeholder="Product URL"
-                className="flex-1"
-              />
-              <Select value={newLinkStore} onValueChange={(v: any) => setNewLinkStore(v)}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="woolworths">Woolworths</SelectItem>
-                  <SelectItem value="coles">Coles</SelectItem>
-                  <SelectItem value="aldi">Aldi</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={handleAddLink} disabled={!newLinkUrl.trim()}>
-                <Plus className="h-4 w-4" />
-              </Button>
+                );
+              })}
             </div>
           </div>
 
@@ -725,7 +942,7 @@ export function GroceryItemEditView({
           {priceHistory.length > 0 && (
             <div className="pt-6 border-t">
               <h3 className="text-lg font-semibold mb-4">Price History</h3>
-              <CombinedPriceHistoryTable priceHistory={priceHistory} />
+              <PriceHistoryMatrixTable productLinks={productLinks} priceHistory={priceHistory} />
             </div>
           )}
         </div>
@@ -773,6 +990,127 @@ export function GroceryItemEditView({
             </Button>
             <Button variant="destructive" onClick={handleDeletePrice}>
               Delete Price
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={productLinkDialogMode !== null}
+        onOpenChange={(open) => {
+          if (!open) closeProductLinkDialog();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{productLinkDialogMode === "create" ? "Add Product Link" : "Edit Product Link"}</DialogTitle>
+            <DialogDescription>
+              {productLinkDialogMode === "create"
+                ? "Enter the store and URL, plus optional label and per-unit quantity."
+                : "Update the store (read-only), URL, label, and per-unit quantity."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Store</label>
+              <Select value={productLinkStore} onValueChange={(v: any) => setProductLinkStore(v)}>
+                <SelectTrigger disabled={productLinkDialogMode === "edit"}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="woolworths">Woolworths</SelectItem>
+                  <SelectItem value="coles">Coles</SelectItem>
+                  <SelectItem value="aldi">Aldi</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">URL</label>
+              <Input value={productLinkUrl} onChange={(e) => setProductLinkUrl(e.target.value)} placeholder="https://..." />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Label</label>
+              <Input value={productLinkLabel} onChange={(e) => setProductLinkLabel(e.target.value)} placeholder="Optional" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Per unit</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                value={productLinkPerUnit}
+                onChange={(e) => setProductLinkPerUnit(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeProductLinkDialog}
+              disabled={isSavingProductLink}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                const trimmedUrl = productLinkUrl.trim();
+                if (!trimmedUrl) {
+                  toast({
+                    title: "URL required",
+                    description: "Please enter a product URL",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                setIsSavingProductLink(true);
+
+                if (productLinkDialogMode === "create") {
+                  const didCreate = await handleAddLink({
+                    url: trimmedUrl,
+                    store: productLinkStore,
+                    label: productLinkLabel,
+                    perUnit: productLinkPerUnit,
+                  });
+                  setIsSavingProductLink(false);
+                  if (didCreate) closeProductLinkDialog();
+                  return;
+                }
+
+                if (!productLinkDialogLink) {
+                  setIsSavingProductLink(false);
+                  return;
+                }
+
+                const trimmedLabel = productLinkLabel.trim();
+                let parsedPerUnit: number | null = null;
+                if (productLinkPerUnit.trim() !== "") {
+                  const numericPerUnit = Number(productLinkPerUnit);
+                  if (!Number.isFinite(numericPerUnit) || numericPerUnit <= 0) {
+                    toast({
+                      title: "Invalid per-unit value",
+                      description: "Per unit must be a positive number",
+                      variant: "destructive",
+                    });
+                    setIsSavingProductLink(false);
+                    return;
+                  }
+                  parsedPerUnit = numericPerUnit;
+                }
+
+                const didUpdate = await handleUpdateLink(productLinkDialogLink.id, {
+                  url: trimmedUrl,
+                  label: trimmedLabel || null,
+                  perUnit: parsedPerUnit,
+                });
+                setIsSavingProductLink(false);
+                if (didUpdate) closeProductLinkDialog();
+              }}
+              disabled={isSavingProductLink}
+            >
+              {isSavingProductLink ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

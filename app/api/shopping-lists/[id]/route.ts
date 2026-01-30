@@ -75,6 +75,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
           productLinks: sli.groceryItem.productLinks.map(pl => ({
             id: pl.id,
             store: pl.store,
+            label: pl.label,
+            perUnit: pl.perUnit,
             regularPrice: pl.regularPrice,
             discountPrice: pl.discountPrice,
             lastRefreshed: pl.lastRefreshed,
@@ -107,6 +109,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
           productLinks: sli.groceryItem.productLinks.map(pl => ({
             id: pl.id,
             store: pl.store,
+            label: pl.label,
+            perUnit: pl.perUnit,
             regularPrice: pl.regularPrice,
             discountPrice: pl.discountPrice,
             lastRefreshed: pl.lastRefreshed,
@@ -134,6 +138,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
       productLinks: sli.groceryItem.productLinks.map(pl => ({
         id: pl.id,
         store: pl.store,
+        label: pl.label,
+        perUnit: pl.perUnit,
         regularPrice: pl.regularPrice,
         discountPrice: pl.discountPrice,
         lastRefreshed: pl.lastRefreshed,

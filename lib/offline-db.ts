@@ -48,6 +48,11 @@ export interface ProductLink {
   groceryItemId: string;
   url: string;
   store: string;
+  label?: string | null;
+  perUnit?: number | null;
+  regularPrice?: number | null;
+  discountPrice?: number | null;
+  lastRefreshed?: string | null;
   lastScrapedAt: string | null;
   createdAt: string;
   updatedAt: string;

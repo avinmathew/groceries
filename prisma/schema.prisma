@@ -81,6 +81,8 @@ model ProductLink {
   id            String   @id @default(cuid())
   url           String
   store         String   // "woolworths" | "coles" | "aldi"
+  label         String?
+  perUnit       Float?
   regularPrice  Float?
   discountPrice Float?
   lastRefreshed DateTime?

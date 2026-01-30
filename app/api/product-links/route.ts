@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 
 export async function POST(request: Request) {
   try {
-    const { url, store, groceryItemId } = await request.json();
+    const { url, store, groceryItemId, label, perUnit } = await request.json();
 
     const trimmedUrl = typeof url === "string" ? url.trim() : "";
 
@@ -18,11 +18,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid store" }, { status: 400 });
     }
 
+    const trimmedLabel = typeof label === "string" ? label.trim() : null;
+
+    let parsedPerUnit: number | null = null;
+    if (perUnit !== undefined && perUnit !== null && perUnit !== "") {
+      const numericPerUnit = Number(perUnit);
+      if (!Number.isFinite(numericPerUnit) || numericPerUnit <= 0) {
+        return NextResponse.json({ error: "perUnit must be a positive number" }, { status: 400 });
+      }
+      parsedPerUnit = numericPerUnit;
+    }
+
     const productLink = await prisma.productLink.create({
       data: {
         url: trimmedUrl,
         store,
         groceryItemId,
+        label: trimmedLabel || null,
+        perUnit: parsedPerUnit,
       },
     });
 

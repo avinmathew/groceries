@@ -29,10 +29,28 @@ type GroceryItem = {
   productLinks: Array<{
     id: string;
     store: string;
+    label?: string | null;
+    perUnit?: number | null;
     regularPrice: number | null;
     discountPrice: number | null;
     lastRefreshed: Date | null;
   }>;
+};
+
+const getPerUnitBase = (links: GroceryItem["productLinks"]) => {
+  const perUnits = links
+    .map((link) => link.perUnit)
+    .filter((value): value is number => typeof value === "number" && value > 0);
+
+  if (!perUnits.length) return null;
+
+  const minUnit = Math.min(...perUnits);
+  return minUnit;
+};
+
+const normalizePrice = (price: number, perUnit: number | null | undefined, base: number | null) => {
+  if (!base || !perUnit || perUnit <= 0) return price;
+  return (price / perUnit) * base;
 };
 
 export function GroceryItemRow({
@@ -90,13 +108,19 @@ export function GroceryItemRow({
 
   const displayName = item.quantity > 1 ? `${item.name} (${item.quantity})` : item.name;
 
+  const perUnitBase = getPerUnitBase(item.productLinks);
+
   // Calculate lowest price for each store
   const getLowestPriceForStore = (store: string): number | null => {
     const storeLinks = item.productLinks.filter((link) => link.store.toLowerCase() === store.toLowerCase());
     if (storeLinks.length === 0) return null;
     
     const prices = storeLinks
-      .map((link) => link.discountPrice ?? link.regularPrice)
+      .map((link) => {
+        const price = link.discountPrice ?? link.regularPrice;
+        if (price === null) return null;
+        return normalizePrice(price, link.perUnit ?? null, perUnitBase);
+      })
       .filter((p): p is number => p !== null);
     
     return prices.length > 0 ? Math.min(...prices) : null;

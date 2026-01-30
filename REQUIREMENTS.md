@@ -33,7 +33,7 @@ Categories are ordered based on a user specified order (number) in the Category 
 If a grocery does not have a allocated category, it is added to an "Uncategorised" category at the bottom of the list.
 On the right of each grocery is an info icon that will bring up an edit view.
 Notes are shown in small grey text under the grocery item name.
-The grocery item shows the lowest price for Woolworths, Coles and Aldi (in that order). Show the icon, and then the price. The lowest price for the grocery item can be highlighted. The price is multiplied by the quantity. Align this to the right.
+The grocery item shows the lowest price for Woolworths, Coles and Aldi (in that order). Show the icon, and then the price. Discount prices for the grocery item are highlighted in a yellow badge. The price is multiplied by the quantity. For per unit pricing, normalise the price to the minimum per unit value across product links (e.g. 300, 400, 500 would be per 300). Align the price to the right.
 Prices are greyed out if they haven't been refreshed since the last Wednesday midnight.
 The total using the lowest price per store should be shown at the bottom of the list, above the "Add an item..."
 A grocery item can be added to multiple shopping lists.
@@ -66,6 +66,8 @@ There are Less and More buttons to indicate the quantity required. If there is o
 There is a dropdown to select the category.
 There is a single line (no newline) free-text Note textbox.
 There is the ability to add links to product pages from Woolworths, Coles and Aldi. Multiple links for a store can be added. Regular prices and discount prices are shown next to each link. The date of last price refresh is shown next to the price in "days ago".
+Links can be given a name (such as a specific brand name).
+Links can also be given a "per unit" number to do price comparisons on a per unit basis with other product links. Per unit prices are shown next to the total price, with all product links using the nearest, lowest power of 10 (e.g. 1, 10, 100, 1000) across all product links (e.g. 800, 400, 200 would be per 100 units).
 Clicking on a price allows the user to delete the price. This is in case there are errors with the scraper. A confirmation dialog should be presented.
 There is a Refresh Prices button that allows all the links for this grocery to be refreshed.
 Clicking Save will bring the user back to the shopping list page.

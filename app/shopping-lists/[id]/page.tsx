@@ -112,6 +112,8 @@ async function getShoppingList(id: string) {
     productLinks: item.productLinks.map((link: any) => ({
       id: link.id,
       store: link.store,
+      label: link.label,
+      perUnit: link.perUnit,
       regularPrice: link.regularPrice,
       discountPrice: link.discountPrice,
       lastRefreshed: link.lastRefreshed?.toISOString() || null,

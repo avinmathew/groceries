@@ -4,14 +4,36 @@ import { prisma } from "@/lib/db";
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
     const body = await request.json();
-    const { regularPrice, discountPrice, lastRefreshed } = body;
+    const { regularPrice, discountPrice, lastRefreshed, label, perUnit, url } = body;
+
+    const trimmedUrl = typeof url === "string" ? url.trim() : url;
+    if (trimmedUrl === "" || trimmedUrl === null) {
+      return NextResponse.json({ error: "url is required" }, { status: 400 });
+    }
+
+    const trimmedLabel = typeof label === "string" ? label.trim() : label;
+
+    let parsedPerUnit = perUnit;
+    if (perUnit === "") {
+      parsedPerUnit = null;
+    }
+    if (parsedPerUnit !== undefined && parsedPerUnit !== null) {
+      const numericPerUnit = Number(parsedPerUnit);
+      if (!Number.isFinite(numericPerUnit) || numericPerUnit <= 0) {
+        return NextResponse.json({ error: "perUnit must be a positive number" }, { status: 400 });
+      }
+      parsedPerUnit = numericPerUnit;
+    }
 
     const updatedLink = await prisma.productLink.update({
       where: { id: params.id },
       data: {
+        ...(trimmedUrl !== undefined && { url: trimmedUrl }),
         ...(regularPrice !== undefined && { regularPrice }),
         ...(discountPrice !== undefined && { discountPrice }),
         ...(lastRefreshed !== undefined && { lastRefreshed }),
+        ...(trimmedLabel !== undefined && { label: trimmedLabel || null }),
+        ...(parsedPerUnit !== undefined && { perUnit: parsedPerUnit }),
       },
     });
 

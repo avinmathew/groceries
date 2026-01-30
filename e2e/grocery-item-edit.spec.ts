@@ -42,16 +42,30 @@ test('edit notes and category persists to list view', async ({ page }) => {
 
   await page.getByPlaceholder('Add notes').fill('Granny Smith');
 
-  const [request] = await Promise.all([
-    page.waitForRequest((req) => req.method() === 'PATCH' && req.url().includes(`/api/grocery-items/${listItem.id}`)),
+  const [notesResponse] = await Promise.all([
+    page.waitForResponse((res) =>
+      res.status() === 200 &&
+      res.request().method() === 'PATCH' &&
+      res.url().includes(`/api/grocery-items/${listItem.id}`)
+    ),
     page.keyboard.press('Tab'),
   ]);
 
-  expect(request.postDataJSON()).toMatchObject({ notes: 'Granny Smith' });
+  expect(notesResponse.request().postDataJSON()).toMatchObject({ notes: 'Granny Smith' });
 
   const categorySelect = page.getByText('Category').locator('..').getByRole('combobox');
   await categorySelect.click();
-  await page.getByRole('option', { name: 'Fruit' }).click();
+
+  const [categoryResponse] = await Promise.all([
+    page.waitForResponse((res) =>
+      res.status() === 200 &&
+      res.request().method() === 'PATCH' &&
+      res.url().includes(`/api/grocery-items/${listItem.id}`)
+    ),
+    page.getByRole('option', { name: 'Fruit' }).click(),
+  ]);
+
+  expect(categoryResponse.request().postDataJSON()).toMatchObject({ categoryId: fruit.id });
 
   await page.getByRole('button', { name: 'Back' }).click();
   await expect(page).toHaveURL(new RegExp(`/shopping-lists/${weekly.id}$`));
@@ -73,11 +87,14 @@ test('add product link appears in list', async ({ page }) => {
   }, { timeout: 30000 });
   await page.locator('a:has(svg.lucide-info)').first().click();
 
-  await page.getByPlaceholder('Product URL').fill('https://example.com/apples');
+  await page.getByRole('button', { name: 'Add Link' }).click();
+  await expect(page.getByRole('heading', { name: 'Add Product Link' })).toBeVisible();
+
+  await page.getByPlaceholder('https://...').fill('https://example.com/apples');
 
   const [request] = await Promise.all([
     page.waitForRequest((req) => req.method() === 'POST' && req.url().includes('/api/product-links')),
-    page.locator('button:has(svg.lucide-plus)').last().click(),
+    page.getByRole('button', { name: 'Save' }).click(),
   ]);
 
   expect(request.postDataJSON()).toMatchObject({

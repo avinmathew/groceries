@@ -34,6 +34,8 @@ type ShoppingList = {
       productLinks: Array<{
         id: string;
         store: string;
+        label?: string | null;
+        perUnit?: number | null;
         regularPrice: number | null;
         discountPrice: number | null;
         lastRefreshed: Date | null;
@@ -53,12 +55,30 @@ type ShoppingList = {
     productLinks: Array<{
       id: string;
       store: string;
+      label?: string | null;
+      perUnit?: number | null;
       regularPrice: number | null;
       discountPrice: number | null;
       lastRefreshed: Date | null;
     }>;
     completedAt: Date | null;
   }>;
+};
+
+const getPerUnitBase = (links: Array<{ perUnit?: number | null }>) => {
+  const perUnits = links
+    .map((link) => link.perUnit)
+    .filter((value): value is number => typeof value === "number" && value > 0);
+
+  if (!perUnits.length) return null;
+
+  const minUnit = Math.min(...perUnits);
+  return minUnit;
+};
+
+const normalizePrice = (price: number, perUnit: number | null | undefined, base: number | null) => {
+  if (!base || !perUnit || perUnit <= 0) return price;
+  return (price / perUnit) * base;
 };
 
 export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppingList: ShoppingList }) {
@@ -336,10 +356,15 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     // Sum up the lowest prices for all active items (not completed)
     shoppingList.categoryGroups.forEach((group) => {
       group.items.forEach((item) => {
+        const perUnitBase = getPerUnitBase(item.productLinks);
         const prices = item.productLinks
-          .map((link) => link.discountPrice ?? link.regularPrice)
+          .map((link) => {
+            const price = link.discountPrice ?? link.regularPrice;
+            if (price === null) return null;
+            return normalizePrice(price, link.perUnit ?? null, perUnitBase);
+          })
           .filter((p): p is number => p !== null);
-        
+
         if (prices.length > 0) {
           const lowestPrice = Math.min(...prices);
           total += lowestPrice * item.quantity;
