@@ -47,14 +47,12 @@ export async function GET() {
       };
 
 
-      // Track lists where the item is currently active (not completed)
+      // Track all lists where the item appears (including completed)
       for (const sli of item.shoppingListItems) {
-        if (!sli.isCompleted) {
-          current.shoppingLists.set(sli.shoppingList.id, {
-            id: sli.shoppingList.id,
-            name: sli.shoppingList.name,
-          });
-        }
+        current.shoppingLists.set(sli.shoppingList.id, {
+          id: sli.shoppingList.id,
+          name: sli.shoppingList.name,
+        });
       }
 
       groceryMap.set(item.name, current);
