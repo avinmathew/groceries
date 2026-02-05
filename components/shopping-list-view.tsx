@@ -264,7 +264,13 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
             completedAt: null
           };
           
-          let targetGroupIndex = updatedGroups.findIndex(group => group.category.id === itemToMove.categoryId);
+          // Find existing group, handling null categoryId properly
+          let targetGroupIndex = updatedGroups.findIndex(group => {
+            if (itemToMove.categoryId === null) {
+              return group.category.id === null || group.category.id === itemToMove.category?.id;
+            }
+            return group.category.id === itemToMove.categoryId;
+          });
           
           if (targetGroupIndex === -1) {
             const newGroup = itemToMove.category;
