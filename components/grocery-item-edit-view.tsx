@@ -297,6 +297,14 @@ export function GroceryItemEditView({
     setIsSavingProductLink(false);
   };
 
+  const detectStoreFromUrl = (url: string): StoreKey => {
+    const urlLower = url.toLowerCase();
+    if (urlLower.includes('woolworths.com')) return 'woolworths';
+    if (urlLower.includes('coles.com')) return 'coles';
+    if (urlLower.includes('aldi.com')) return 'aldi';
+    return 'woolworths'; // default
+  };
+
   const openCreateProductLinkDialog = () => {
     setProductLinkDialogMode("create");
     setProductLinkDialogLink(null);
@@ -1034,11 +1042,26 @@ export function GroceryItemEditView({
             <DialogTitle>{productLinkDialogMode === "create" ? "Add Product Link" : "Edit Product Link"}</DialogTitle>
             <DialogDescription>
               {productLinkDialogMode === "create"
-                ? "Enter the store and URL, plus optional label and per-unit quantity."
+                ? "Enter the product URL. The store will be detected automatically."
                 : "Update the store, URL, label, and per-unit quantity."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">URL</label>
+              <Input 
+                value={productLinkUrl} 
+                onChange={(e) => {
+                  const newUrl = e.target.value;
+                  setProductLinkUrl(newUrl);
+                  if (productLinkDialogMode === "create" && newUrl.trim()) {
+                    const detectedStore = detectStoreFromUrl(newUrl);
+                    setProductLinkStore(detectedStore);
+                  }
+                }} 
+                placeholder="https://..." 
+              />
+            </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Store</label>
               <Select value={productLinkStore} onValueChange={(v: any) => setProductLinkStore(v)}>
@@ -1051,10 +1074,6 @@ export function GroceryItemEditView({
                   <SelectItem value="aldi">Aldi</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">URL</label>
-              <Input value={productLinkUrl} onChange={(e) => setProductLinkUrl(e.target.value)} placeholder="https://..." />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Label</label>
