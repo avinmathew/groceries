@@ -263,6 +263,30 @@ export function GroceryItemEditView({
     return STORE_DISPLAY_NAMES[storeKey] ?? link.store;
   };
 
+  const sortedProductLinks = useMemo(() => {
+    const storeOrder: Record<string, number> = {
+      woolworths: 1,
+      coles: 2,
+      aldi: 3,
+    };
+
+    return [...productLinks].sort((a, b) => {
+      const aStoreLower = a.store.toLowerCase();
+      const bStoreLower = b.store.toLowerCase();
+      const aStoreOrder = storeOrder[aStoreLower] ?? 999;
+      const bStoreOrder = storeOrder[bStoreLower] ?? 999;
+
+      if (aStoreOrder !== bStoreOrder) {
+        return aStoreOrder - bStoreOrder;
+      }
+
+      // Secondary sort by display name
+      const aName = getProductLinkDisplayName(a).toLowerCase();
+      const bName = getProductLinkDisplayName(b).toLowerCase();
+      return aName.localeCompare(bName);
+    });
+  }, [productLinks]);
+
   const closeProductLinkDialog = () => {
     setProductLinkDialogMode(null);
     setProductLinkDialogLink(null);
@@ -821,7 +845,7 @@ export function GroceryItemEditView({
               </div>
             </div>
             <div className="space-y-2">
-              {productLinks.map((link) => {
+              {sortedProductLinks.map((link) => {
                 const perUnitDisplay = getPerUnitDisplay(link);
                 const displayName = getProductLinkDisplayName(link);
                 const storeLower = link.store.toLowerCase();
