@@ -400,12 +400,12 @@ export function GroceryItemEditView({
 
   const handleUpdateLink = async (
     linkId: string,
-    updates: { url?: string; label?: string | null; perUnit?: number | null }
+    updates: { url?: string; store?: string; label?: string | null; perUnit?: number | null }
   ): Promise<boolean> => {
     const existing = productLinks.find((link) => link.id === linkId);
     if (!existing) return false;
 
-    const normalizedUpdates: { url?: string; label?: string | null; perUnit?: number | null } = {};
+    const normalizedUpdates: { url?: string; store?: string; label?: string | null; perUnit?: number | null } = {};
 
     if (updates.url !== undefined) {
       const trimmedUrl = updates.url.trim();
@@ -418,6 +418,10 @@ export function GroceryItemEditView({
         return false;
       }
       normalizedUpdates.url = trimmedUrl;
+    }
+
+    if (updates.store !== undefined) {
+      normalizedUpdates.store = updates.store;
     }
 
     if (updates.label !== undefined) {
@@ -1007,14 +1011,14 @@ export function GroceryItemEditView({
             <DialogDescription>
               {productLinkDialogMode === "create"
                 ? "Enter the store and URL, plus optional label and per-unit quantity."
-                : "Update the store (read-only), URL, label, and per-unit quantity."}
+                : "Update the store, URL, label, and per-unit quantity."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
               <label className="text-sm font-medium mb-1 block">Store</label>
               <Select value={productLinkStore} onValueChange={(v: any) => setProductLinkStore(v)}>
-                <SelectTrigger disabled={productLinkDialogMode === "edit"}>
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1102,6 +1106,7 @@ export function GroceryItemEditView({
 
                 const didUpdate = await handleUpdateLink(productLinkDialogLink.id, {
                   url: trimmedUrl,
+                  store: productLinkStore,
                   label: trimmedLabel || null,
                   perUnit: parsedPerUnit,
                 });
