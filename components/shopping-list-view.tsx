@@ -27,7 +27,7 @@ type ShoppingList = {
       name: string;
       quantity: number;
       notes: string | null;
-      isCompleted: boolean;
+      status: string;
       categoryId: string | null;
       category: { id: string; name: string; order: number };
       shoppingListCount?: number;
@@ -42,13 +42,33 @@ type ShoppingList = {
       }>;
     }>;
   }>;
+  watchlistItems: Array<{
+    id: string;
+    groceryItemId: string;
+    name: string;
+    quantity: number;
+    notes: string | null;
+    status: string;
+    categoryId: string | null;
+    category: { id: string; name: string; order: number };
+    shoppingListCount?: number;
+    productLinks: Array<{
+      id: string;
+      store: string;
+      label?: string | null;
+      perUnit?: number | null;
+      regularPrice: number | null;
+      discountPrice: number | null;
+      lastRefreshed: Date | null;
+    }>;
+  }>;
   completedItems: Array<{
     id: string;
     groceryItemId: string;
     name: string;
     quantity: number;
     notes: string | null;
-    isCompleted: boolean;
+    status: string;
     categoryId: string | null;
     category: { id: string; name: string; order: number };
     shoppingListCount?: number;
@@ -153,16 +173,21 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     pollingRef.current = true;
     
     try {
-      // Collect IDs of all active (non-completed) items
+      // Collect IDs of all active and watchlisted items (exclude completed items)
       const activeItemIds = shoppingList.categoryGroups
         .flatMap(group => group.items.map(item => item.groceryItemId));
+      
+      const watchlistItemIds = (shoppingList.watchlistItems || [])
+        .map(item => item.groceryItemId);
+      
+      const allItemIds = [...activeItemIds, ...watchlistItemIds];
 
       // Start the refresh process in the background (returns immediately)
       const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          groceryItemIds: activeItemIds,
+          groceryItemIds: allItemIds,
           shoppingListId: shoppingList.id 
         }),
       });
@@ -226,41 +251,46 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     }
   };
 
-  const handleToggleComplete = async (itemId: string, isCompleted: boolean) => {
-    // Optimistic update
-    const newIsCompleted = !isCompleted;
+  const handleToggleComplete = async (itemId: string, currentStatus: string) => {
+    // Optimistic update - clicking always moves to completed, unless already completed
+    const newStatus = currentStatus === 'completed' ? 'active' : 'completed';
     setShoppingList(prev => {
       let updatedGroups = prev.categoryGroups.map(group => ({
         ...group,
         items: group.items.filter(item => item.id !== itemId)
       }));
+      let updatedWatchlistItems = prev.watchlistItems.filter(item => item.id !== itemId);
 
-      if (newIsCompleted) {
-        // Move to completed items
-        const itemToMove = prev.categoryGroups
+      if (newStatus === 'completed') {
+        // Move to completed items from either active or watchlist
+        const itemFromActive = prev.categoryGroups
           .flatMap(group => group.items)
           .find(item => item.id === itemId);
+        
+        const itemFromWatchlist = prev.watchlistItems.find(item => item.id === itemId);
+        const itemToMove = itemFromActive || itemFromWatchlist;
         
         if (itemToMove) {
           updatedGroups = updatedGroups.filter(group => group.items.length > 0);
           return {
             ...prev,
             categoryGroups: updatedGroups,
+            watchlistItems: updatedWatchlistItems,
             completedItems: [{
               ...itemToMove,
-              isCompleted: true,
+              status: 'completed',
               completedAt: new Date()
             }, ...prev.completedItems]
           };
         }
       } else {
-        // Move back to active items
+        // Move back to active items from completed
         const itemToMove = prev.completedItems.find(item => item.id === itemId);
         
         if (itemToMove) {
           const activeItem = {
             ...itemToMove,
-            isCompleted: false,
+            status: 'active',
             completedAt: null
           };
           
@@ -292,6 +322,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
           return {
             ...prev,
             categoryGroups: updatedGroups,
+            watchlistItems: prev.watchlistItems,
             completedItems: prev.completedItems.filter(item => item.id !== itemId)
           };
         }
@@ -304,14 +335,14 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
       await queueMutation(
         'PATCH',
         `${BASE_PATH}/api/grocery-items/${itemId}`,
-        { isCompleted: newIsCompleted },
+        { status: newStatus },
         async () => {
           // Update in IndexedDB
           const item = await offlineDB.shoppingListItems.get(itemId);
           if (item) {
             await offlineDB.shoppingListItems.put({
               ...item,
-              completed: newIsCompleted,
+              completed: newStatus === 'completed',
               updatedAt: new Date().toISOString(),
               _synced: false,
             });
@@ -343,11 +374,13 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
         }))
         .filter(group => group.items.length > 0);
 
+      const updatedWatchlistItems = prev.watchlistItems.filter(item => item.id !== itemId);
       const updatedCompletedItems = prev.completedItems.filter(item => item.id !== itemId);
 
       return {
         ...prev,
         categoryGroups: updatedGroups,
+        watchlistItems: updatedWatchlistItems,
         completedItems: updatedCompletedItems,
       };
     });
@@ -381,6 +414,31 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     return total > 0 ? total : null;
   }, [shoppingList]);
 
+  // Calculate total price for watchlist items
+  const watchlistTotal = useMemo(() => {
+    if (!shoppingList?.watchlistItems || shoppingList.watchlistItems.length === 0) return null;
+    
+    let total = 0;
+
+    shoppingList.watchlistItems.forEach((item) => {
+      const perUnitBase = getPerUnitBase(item.productLinks);
+      const prices = item.productLinks
+        .map((link) => {
+          const price = link.discountPrice ?? link.regularPrice;
+          if (price === null) return null;
+          return normalizePrice(price, link.perUnit ?? null, perUnitBase);
+        })
+        .filter((p): p is number => p !== null);
+
+      if (prices.length > 0) {
+        const lowestPrice = Math.min(...prices);
+        total += lowestPrice * item.quantity;
+      }
+    });
+
+    return total > 0 ? total : null;
+  }, [shoppingList]);
+
   const handleBackClick = () => {
     router.push('/shopping-lists');
     router.refresh();
@@ -399,7 +457,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
               variant="ghost"
               size="icon"
               onClick={handleRefreshPrices}
-              disabled={isRefreshing || !shoppingList || !shoppingList.categoryGroups || !shoppingList.categoryGroups.some(g => g.items.length > 0)}
+              disabled={isRefreshing || !shoppingList || !shoppingList.categoryGroups || (!shoppingList.categoryGroups.some(g => g.items.length > 0) && (!shoppingList.watchlistItems || shoppingList.watchlistItems.length === 0))}
             >
               <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
@@ -434,7 +492,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
                       key={item.id}
                       item={item}
                       isEditMode={isEditMode}
-                      onToggleComplete={() => handleToggleComplete(item.id, item.isCompleted)}
+                      onToggleComplete={() => handleToggleComplete(item.id, item.status)}
                       onItemDeleted={handleItemDeleted}
                     />
                   ))}
@@ -457,6 +515,34 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
               <AddGroceryDialog shoppingListId={shoppingList.id} variant="link" onItemAdded={handleItemAdded} />
             </div>
 
+            {/* Watch List Section */}
+            {shoppingList.watchlistItems && shoppingList.watchlistItems.length > 0 && (
+              <div className="pt-6">
+                <div className="sticky top-[56px] z-5 bg-[#088395] px-2 py-1">
+                  <h2 className="text-sm text-white font-semibold">Watch List</h2>
+                </div>
+                <div className="space-y-1">
+                  {shoppingList.watchlistItems.map((item) => (
+                    <GroceryItemRow
+                      key={item.id}
+                      item={item}
+                      isEditMode={isEditMode}
+                      onToggleComplete={() => handleToggleComplete(item.id, item.status)}
+                      onItemDeleted={handleItemDeleted}
+                    />
+                  ))}
+                </div>
+                {watchlistTotal !== null && (
+                  <div className="pt-2">
+                    <div className="flex items-center justify-end gap-4 px-3 py-2 bg-blue-50 rounded-lg">
+                      <span className="text-sm font-medium text-muted-foreground">Watch List Total:</span>
+                      <span>${watchlistTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Crossed Off Section */}
             {shoppingList.completedItems && shoppingList.completedItems.length > 0 && (
               <div className="pt-6">
@@ -469,7 +555,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
                       key={item.id}
                       item={item}
                       isEditMode={isEditMode}
-                      onToggleComplete={() => handleToggleComplete(item.id, item.isCompleted)}
+                      onToggleComplete={() => handleToggleComplete(item.id, item.status)}
                       onItemDeleted={handleItemDeleted}
                     />
                   ))}

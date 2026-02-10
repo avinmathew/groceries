@@ -59,7 +59,7 @@ describe('POST /api/grocery-items', () => {
     const mockShoppingListItem = {
       id: 'sli1',
       quantity: 1,
-      isCompleted: false,
+      status: 'active',
       shoppingListId: 'list1',
       groceryItemId: 'g1',
       createdAt: new Date(),
@@ -139,7 +139,7 @@ describe('POST /api/grocery-items', () => {
     const mockShoppingListItem = {
       id: 'sli1',
       quantity: 1,
-      isCompleted: false,
+      status: 'active',
       shoppingListId: 'list1',
       groceryItemId: 'g1',
       createdAt: new Date(),
@@ -191,7 +191,7 @@ describe('POST /api/grocery-items', () => {
     const existingShoppingListItem = {
       id: 'sli1',
       quantity: 2,
-      isCompleted: false,
+      status: 'active',
       completedAt: null,
       shoppingListId: 'list1',
       groceryItemId: 'g1',
@@ -221,7 +221,7 @@ describe('POST /api/grocery-items', () => {
     expect(mockPrisma.shoppingListItem.update).toHaveBeenCalledWith({
       where: { id: 'sli1' },
       data: {
-        isCompleted: false,
+        status: 'active',
         completedAt: null,
         quantity: 3,
       },
@@ -250,7 +250,7 @@ describe('POST /api/grocery-items', () => {
     const existingShoppingListItem = {
       id: 'sli1',
       quantity: 3,
-      isCompleted: true,
+      status: 'completed',
       completedAt: new Date(),
       shoppingListId: 'list1',
       groceryItemId: 'g1',
@@ -260,7 +260,7 @@ describe('POST /api/grocery-items', () => {
 
     const updatedShoppingListItem = {
       ...existingShoppingListItem,
-      isCompleted: false,
+      status: 'active',
       completedAt: null,
       groceryItem: mockGrocery,
     } as any;
@@ -281,7 +281,7 @@ describe('POST /api/grocery-items', () => {
     expect(mockPrisma.shoppingListItem.update).toHaveBeenCalledWith({
       where: { id: 'sli1' },
       data: {
-        isCompleted: false,
+        status: 'active',
         completedAt: null,
       },
       include: {
@@ -453,3 +453,4 @@ describe('DELETE /api/grocery-items/[id]', () => {
     expect(data.error).toContain('Failed to delete shopping list item');
   });
 });
+

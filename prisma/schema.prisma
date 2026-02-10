@@ -52,7 +52,7 @@ model ShoppingListItem {
   id            String   @id @default(cuid())
   quantity      Int      @default(1)
   notes         String?
-  isCompleted   Boolean  @default(false)
+  status        String   @default("active") // "active" | "watchlisted" | "completed"
   completedAt   DateTime?
   groceryItemId String
   shoppingListId String

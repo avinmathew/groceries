@@ -29,10 +29,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
       orderBy: { order: "asc" },
     });
 
-    // Separate items into completed and not completed
-    const activeItems = shoppingList.items.filter((item) => !item.isCompleted);
+    // Separate items by status
+    const activeItems = shoppingList.items.filter((item) => item.status === 'active');
+    const watchlistItems = shoppingList.items.filter((item) => item.status === 'watchlisted');
     const completedItems = shoppingList.items
-      .filter((item) => item.isCompleted)
+      .filter((item) => item.status === 'completed')
       .sort((a, b) => {
         const aTime = a.completedAt?.getTime() ?? 0;
         const bTime = b.completedAt?.getTime() ?? 0;
@@ -69,7 +70,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
           name: sli.groceryItem.name,
           quantity: sli.quantity,
           notes: sli.notes,
-          isCompleted: sli.isCompleted,
+          status: sli.status,
           categoryId: sli.groceryItem.categoryId,
           category: category,
           productLinks: sli.groceryItem.productLinks.map(pl => ({
@@ -103,7 +104,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
           name: sli.groceryItem.name,
           quantity: sli.quantity,
           notes: sli.notes,
-          isCompleted: sli.isCompleted,
+          status: sli.status,
           categoryId: sli.groceryItem.categoryId,
           category: uncategorizedCategory,
           productLinks: sli.groceryItem.productLinks.map(pl => ({
@@ -126,7 +127,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       name: sli.groceryItem.name,
       quantity: sli.quantity,
       notes: sli.notes,
-      isCompleted: sli.isCompleted,
+      status: sli.status,
       categoryId: sli.groceryItem.categoryId,
       category: sli.groceryItem.category || { 
         id: "uncategorized", 
@@ -148,11 +149,39 @@ export async function GET(request: Request, { params }: { params: { id: string }
       shoppingListCount: sli.groceryItem.shoppingListItems.length,
     }));
 
+    const formattedWatchlistItems = watchlistItems.map(sli => ({
+      id: sli.id,
+      groceryItemId: sli.groceryItemId,
+      name: sli.groceryItem.name,
+      quantity: sli.quantity,
+      notes: sli.notes,
+      status: sli.status,
+      categoryId: sli.groceryItem.categoryId,
+      category: sli.groceryItem.category || { 
+        id: "uncategorized", 
+        name: "Uncategorised", 
+        order: 999999,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      productLinks: sli.groceryItem.productLinks.map(pl => ({
+        id: pl.id,
+        store: pl.store,
+        label: pl.label,
+        perUnit: pl.perUnit,
+        regularPrice: pl.regularPrice,
+        discountPrice: pl.discountPrice,
+        lastRefreshed: pl.lastRefreshed,
+      })),
+      shoppingListCount: sli.groceryItem.shoppingListItems.length,
+    }));
+
     return NextResponse.json({
       id: shoppingList.id,
       name: shoppingList.name,
       refreshStatus: shoppingList.refreshStatus,
       categoryGroups,
+      watchlistItems: formattedWatchlistItems,
       completedItems: formattedCompletedItems,
     }, {
       headers: {

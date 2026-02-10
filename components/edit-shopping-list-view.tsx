@@ -20,7 +20,7 @@ import { BASE_PATH } from "@/lib/utils";
 type ShoppingList = {
   id: string;
   name: string;
-  items: Array<{ id: string; isCompleted?: boolean }>;
+  items: Array<{ id: string; status?: string }>;
 };
 
 export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingList }) {
@@ -133,9 +133,9 @@ export function EditShoppingListView({ shoppingList }: { shoppingList: ShoppingL
             <DialogTitle>Delete Shopping List</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete the shopping list &quot;{shoppingList.name}&quot;?
-              {shoppingList.items.filter(item => item.isCompleted !== true).length > 0 && (
+              {shoppingList.items.filter(item => item.status !== 'completed').length > 0 && (
                 <span className="block mt-2 mb-2 font-semibold">
-                  It has {shoppingList.items.filter(item => item.isCompleted !== true).length} active item{shoppingList.items.filter(item => item.isCompleted !== true).length !== 1 ? "s" : ""}.
+                  It has {shoppingList.items.filter(item => item.status !== 'completed').length} active item{shoppingList.items.filter(item => item.status !== 'completed').length !== 1 ? "s" : ""}.
                 </span>
               )}
               {" "}This action cannot be undone.

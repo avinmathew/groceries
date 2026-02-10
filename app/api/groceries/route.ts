@@ -17,7 +17,7 @@ export async function GET() {
         categoryId: true,
         shoppingListItems: {
           select: {
-            isCompleted: true,
+            status: true,
             shoppingList: {
               select: {
                 id: true,

@@ -28,10 +28,11 @@ async function getShoppingList(id: string) {
     orderBy: { order: "asc" },
   });
 
-  // Separate items into completed and not completed
-  const activeItems = shoppingList.items.filter((item) => !item.isCompleted);
+  // Separate items by status
+  const activeItems = shoppingList.items.filter((item) => item.status === 'active');
+  const watchlistItems = shoppingList.items.filter((item) => item.status === 'watchlisted');
   const completedItems = shoppingList.items
-    .filter((item) => item.isCompleted)
+    .filter((item) => item.status === 'completed')
     .sort((a, b) => {
       const aTime = a.completedAt?.getTime() ?? 0;
       const bTime = b.completedAt?.getTime() ?? 0;
@@ -68,7 +69,7 @@ async function getShoppingList(id: string) {
         name: sli.groceryItem.name,
         quantity: sli.quantity,
         notes: sli.notes,
-        isCompleted: sli.isCompleted,
+        status: sli.status,
         categoryId: sli.groceryItem.categoryId,
         category: category,
         productLinks: sli.groceryItem.productLinks,
@@ -94,7 +95,7 @@ async function getShoppingList(id: string) {
         name: sli.groceryItem.name,
         quantity: sli.quantity,
         notes: sli.notes,
-        isCompleted: sli.isCompleted,
+        status: sli.status,
         categoryId: sli.groceryItem.categoryId,
         category: uncategorizedCategory,
         productLinks: sli.groceryItem.productLinks,
@@ -132,7 +133,7 @@ async function getShoppingList(id: string) {
       name: sli.groceryItem.name,
       quantity: sli.quantity,
       notes: sli.notes,
-      isCompleted: sli.isCompleted,
+      status: sli.status,
       categoryId: sli.groceryItem.categoryId,
       category: sli.groceryItem.category || { 
         id: "uncategorized", 
@@ -149,6 +150,29 @@ async function getShoppingList(id: string) {
     })
   );
 
+  const serializedWatchlistItems = watchlistItems.map(sli => 
+    serializeItem({
+      id: sli.id,
+      groceryItemId: sli.groceryItemId,
+      name: sli.groceryItem.name,
+      quantity: sli.quantity,
+      notes: sli.notes,
+      status: sli.status,
+      categoryId: sli.groceryItem.categoryId,
+      category: sli.groceryItem.category || { 
+        id: "uncategorized", 
+        name: "Uncategorised", 
+        order: 999999,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      productLinks: sli.groceryItem.productLinks,
+      createdAt: sli.createdAt,
+      updatedAt: sli.updatedAt,
+      shoppingListCount: sli.groceryItem.shoppingListItems.length,
+    })
+  );
+
   return {
     id: shoppingList.id,
     name: shoppingList.name,
@@ -156,6 +180,7 @@ async function getShoppingList(id: string) {
     createdAt: shoppingList.createdAt.toISOString(),
     updatedAt: shoppingList.updatedAt.toISOString(),
     categoryGroups: serializedCategoryGroups,
+    watchlistItems: serializedWatchlistItems,
     completedItems: serializedCompletedItems,
   };
 }

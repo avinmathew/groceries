@@ -37,6 +37,7 @@ The grocery item shows the lowest price for Woolworths, Coles and Aldi (in that 
 Prices are greyed out if they haven't been refreshed since the last Wednesday midnight.
 The total using the lowest price per store should be shown at the bottom of the list, above the "Add an item..."
 A grocery item can be added to multiple shopping lists.
+A watch list holds items that aren't on the main shopping list, but prices are refreshed for items on the watch list.
 
 ### Header
 In a non-scrolling header:

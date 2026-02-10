@@ -39,7 +39,7 @@ async function getGroceryItem(id: string) {
     name: item.groceryItem.name,
     quantity: item.quantity,
     notes: item.notes,
-    isCompleted: item.isCompleted,
+    status: item.status,
     completedAt: item.completedAt?.toISOString() || null,
     categoryId: item.groceryItem.categoryId,
     createdAt: item.createdAt.toISOString(),

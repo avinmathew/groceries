@@ -24,7 +24,7 @@ type GroceryItem = {
   name: string;
   quantity: number;
   notes: string | null;
-  isCompleted: boolean;
+  status: string;
   shoppingListCount?: number;
   productLinks: Array<{
     id: string;
@@ -58,11 +58,13 @@ export function GroceryItemRow({
   isEditMode,
   onToggleComplete,
   onItemDeleted,
+  onStatusChange,
 }: {
   item: GroceryItem;
   isEditMode: boolean;
   onToggleComplete: () => void;
   onItemDeleted?: (itemId: string) => void;
+  onStatusChange?: (itemId: string, newStatus: string) => void;
 }) {
   const { toast } = useToast();
   const router = useRouter();
@@ -180,12 +182,23 @@ export function GroceryItemRow({
           <GripVertical className="h-4 w-4" />
         </Button>
       )}
+      
+      {/* Status badge - shows only in edit mode for non-active items */}
+      {isEditMode && item.status !== 'active' && (
+        <Badge 
+          variant={item.status === 'watchlisted' ? 'default' : 'secondary'}
+          className={item.status === 'watchlisted' ? 'bg-blue-600' : ''}
+        >
+          {item.status === 'watchlisted' ? 'Watch' : 'Done'}
+        </Badge>
+      )}
+      
       <button
         onClick={onToggleComplete}
         className="flex-1 text-left"
         disabled={isEditMode}
       >
-        <div className={`flex items-center gap-2 ${item.isCompleted ? "line-through" : ""}`}>
+        <div className={`flex items-center gap-2 ${item.status === 'completed' ? "line-through" : ""}`}>
           <span className="font-medium">{displayName}</span>
         </div>
         {item.notes && (

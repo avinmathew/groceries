@@ -213,6 +213,7 @@ export function GroceryItemEditView({
   const [name, setName] = useState(initialItem.name);
   const [quantity, setQuantity] = useState(initialItem.quantity);
   const [notes, setNotes] = useState(initialItem.notes || "");
+  const [status, setStatus] = useState((initialItem as any).status || "active");
   // Use "uncategorised" as a special value instead of empty string for Select
   const [categoryId, setCategoryId] = useState(initialItem.categoryId || "uncategorised");
   const [productLinks, setProductLinks] = useState(initialItem.productLinks);
@@ -388,13 +389,14 @@ export function GroceryItemEditView({
     };
   }, [refreshProductLinks]);
 
-  const saveField = useCallback(async (fieldData?: Partial<{name: string; quantity: number; notes: string; categoryId: string}>) => {
+  const saveField = useCallback(async (fieldData?: Partial<{name: string; quantity: number; notes: string; categoryId: string; status: string}>) => {
     // Prepare the data to save
     const dataToSave = fieldData || {
       name: name.trim(),
       quantity,
       notes: notes.trim() || null,
       categoryId: categoryId === "uncategorised" ? null : categoryId,
+      status,
     };
 
     // Don't save if name is empty
@@ -412,6 +414,7 @@ export function GroceryItemEditView({
           quantity: dataToSave.quantity,
           notes: dataToSave.notes || null,
           categoryId: dataToSave.categoryId === "uncategorised" ? null : dataToSave.categoryId,
+          status: dataToSave.status,
         }),
       });
 
@@ -428,7 +431,7 @@ export function GroceryItemEditView({
     } finally {
       setIsSaving(false);
     }
-  }, [initialItem.id, toast, router, name, quantity, notes, categoryId]);
+  }, [initialItem.id, toast, router, name, quantity, notes, categoryId, status]);
 
   const handleUpdateLink = async (
     linkId: string,
@@ -767,7 +770,7 @@ export function GroceryItemEditView({
               value={name} 
               onChange={(e) => setName(e.target.value)}
               autoCapitalize="none"
-              onBlur={() => saveField({name, quantity, notes, categoryId})}
+              onBlur={() => saveField({name, quantity, notes, categoryId, status})}
               placeholder="Item name" 
             />
           </div>
@@ -780,7 +783,7 @@ export function GroceryItemEditView({
                 onClick={() => {
                   const newQty = Math.max(1, quantity - 1);
                   setQuantity(newQty);
-                  saveField({name, quantity: newQty, notes, categoryId});
+                  saveField({name, quantity: newQty, notes, categoryId, status});
                 }}
                 disabled={quantity <= 1}
               >
@@ -790,7 +793,7 @@ export function GroceryItemEditView({
               <Button variant="outline" onClick={() => {
                 const newQty = quantity + 1;
                 setQuantity(newQty);
-                saveField({name, quantity: newQty, notes, categoryId});
+                saveField({name, quantity: newQty, notes, categoryId, status});
               }}>
                 More
               </Button>
@@ -806,7 +809,7 @@ export function GroceryItemEditView({
             <label className="text-sm font-medium mb-2 block">Category</label>
             <Select value={categoryId} onValueChange={(newCategoryId) => {
               setCategoryId(newCategoryId);
-              saveField({name, quantity, notes, categoryId: newCategoryId});
+              saveField({name, quantity, notes, categoryId: newCategoryId, status});
             }}>
               <SelectTrigger>
                 <SelectValue placeholder="Select category" />
@@ -827,10 +830,32 @@ export function GroceryItemEditView({
             <Input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              onBlur={() => saveField({name, quantity, notes, categoryId})}
+              onBlur={() => saveField({name, quantity, notes, categoryId, status})}
               placeholder="Add notes"
               maxLength={500}
             />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-2 block">Status</label>
+            <Select value={status} onValueChange={(newStatus) => {
+              setStatus(newStatus);
+              saveField({name, quantity, notes, categoryId, status: newStatus});
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active (Main List)</SelectItem>
+                <SelectItem value="watchlisted">Watch List</SelectItem>
+                <SelectItem value="completed">Crossed Off</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground mt-2">
+              {status === 'active' && 'Item is on your main shopping list'}
+              {status === 'watchlisted' && 'Watching price - not actively shopping'}
+              {status === 'completed' && 'Item is crossed off the list'}
+            </p>
           </div>
 
           <div>

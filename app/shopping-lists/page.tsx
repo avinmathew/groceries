@@ -10,7 +10,9 @@ async function getShoppingLists() {
     include: {
       items: {
         where: {
-          isCompleted: false,
+          status: {
+            not: 'completed',
+          },
         },
       },
     },

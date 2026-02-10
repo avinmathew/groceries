@@ -50,11 +50,11 @@ export async function POST(request: Request) {
       // - If crossed off (completed): uncross without changing quantity
       // - If not crossed off: increment quantity by requested amount
       const updateData: any = {
-        isCompleted: false,
+        status: 'active',
         completedAt: null,
       };
 
-      if (!existingShoppingListItem.isCompleted) {
+      if (existingShoppingListItem.status !== 'completed') {
         // Item is already on the list and not crossed off - increment quantity
         updateData.quantity = (existingShoppingListItem.quantity ?? 0) + (quantity ?? 1);
       }

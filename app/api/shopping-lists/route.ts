@@ -9,7 +9,9 @@ export async function GET() {
       include: {
         items: {
           where: {
-            isCompleted: false,
+            status: {
+              not: 'completed',
+            },
           },
         },
       },

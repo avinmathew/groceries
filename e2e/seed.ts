@@ -41,18 +41,18 @@ export async function addItemToList(options: {
   groceryItemId: string;
   quantity?: number;
   notes?: string | null;
-  isCompleted?: boolean;
+  status?: string;
   completedAt?: Date | null;
 }) {
-  const { shoppingListId, groceryItemId, quantity = 1, notes = null, isCompleted = false, completedAt } = options;
+  const { shoppingListId, groceryItemId, quantity = 1, notes = null, status = 'active', completedAt } = options;
   return prisma.shoppingListItem.create({
     data: {
       shoppingListId,
       groceryItemId,
       quantity,
       notes,
-      isCompleted,
-      completedAt: completedAt ?? (isCompleted ? new Date() : null),
+      status,
+      completedAt: completedAt ?? (status === 'completed' ? new Date() : null),
     },
   });
 }

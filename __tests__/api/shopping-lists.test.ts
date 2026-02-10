@@ -63,7 +63,7 @@ describe('GET /api/shopping-lists', () => {
     expect(mockPrisma.shoppingList.findMany).toHaveBeenCalledWith({
       include: {
         items: {
-          where: { isCompleted: false },
+          where: { status: { not: 'completed' } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -176,7 +176,7 @@ describe('GET /api/shopping-lists/[id]', () => {
           groceryItemId: 'g1',
           quantity: 1,
           notes: '',
-          isCompleted: false,
+          status: { not: 'completed' },
           completedAt: null,
           groceryItem: {
             id: 'g1',
@@ -323,3 +323,4 @@ describe('DELETE /api/shopping-lists/[id]', () => {
     expect(data.error).toContain('Failed to delete shopping list');
   });
 });
+

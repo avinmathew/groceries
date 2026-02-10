@@ -85,7 +85,7 @@ test('cross off and restore item', async ({ page }) => {
     page.getByText('Apples').click(),
   ]);
 
-  expect(completeRequest.postDataJSON()).toMatchObject({ isCompleted: true });
+  expect(completeRequest.postDataJSON()).toMatchObject({ status: 'completed' });
   await expect(page.getByText('Crossed off')).toBeVisible();
 
   const [restoreRequest] = await Promise.all([
@@ -93,7 +93,7 @@ test('cross off and restore item', async ({ page }) => {
     page.getByText('Apples').click(),
   ]);
 
-  expect(restoreRequest.postDataJSON()).toMatchObject({ isCompleted: false });
+  expect(restoreRequest.postDataJSON()).toMatchObject({ status: 'active' });
   await expect(page.getByText('Crossed off')).toBeHidden();
 });
 

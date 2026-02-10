@@ -53,14 +53,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { name, quantity, notes, categoryId, isCompleted } = await request.json();
+    const { name, quantity, notes, categoryId, status } = await request.json();
 
     const updateData: any = {};
     if (quantity !== undefined) updateData.quantity = quantity;
     if (notes !== undefined) updateData.notes = typeof notes === "string" ? notes.trim() || null : notes;
-    if (isCompleted !== undefined) {
-      updateData.isCompleted = isCompleted;
-      updateData.completedAt = isCompleted ? new Date() : null;
+    if (status !== undefined) {
+      updateData.status = status;
+      updateData.completedAt = status === 'completed' ? new Date() : null;
     }
 
     // Update the shopping list item
