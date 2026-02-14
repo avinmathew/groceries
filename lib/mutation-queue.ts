@@ -1,5 +1,5 @@
 import { offlineDB, PendingMutation } from './offline-db';
-import { invalidateCache } from './api-utils';
+import { invalidateCache } from './client/offline-fetch';
 
 export function generateClientId(): string {
   return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -18,6 +18,7 @@ export async function enqueueMutation(
     body,
     timestamp: new Date().toISOString(),
     retries: 0,
+    idempotencyKey: id, // Use the same ID as idempotency key
   };
   await offlineDB.pendingMutations.add(mutation);
   console.log(`✓ Queued mutation: ${method} ${url}`, mutation);
@@ -65,6 +66,7 @@ export async function flushMutationQueue(): Promise<FlushResult> {
         method: mutation.method,
         headers: {
           'Content-Type': 'application/json',
+          'X-Idempotency-Key': mutation.idempotencyKey || mutation.id,
         },
         body: mutation.body ? JSON.stringify(mutation.body) : undefined,
       });

@@ -1,35 +1,42 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { incrementUsage } from "@/lib/frequency";
-import { successResponse, validationError, serverError, getErrorMessage } from "@/lib/api-utils";
+import { successResponse, validationError, serverError, getErrorMessage } from "@/lib/server/api-responses";
+import { validateRequest } from "@/lib/server/validate-request";
+import { addItemToShoppingListSchema } from "@/lib/schemas/api-schemas";
+import { getIdempotencyKey, checkIdempotencyKey, storeIdempotencyKey } from "@/lib/server/idempotency";
 
 export async function POST(request: Request) {
   try {
-    const { name, shoppingListId, categoryId, quantity = 1 } = await request.json();
-
-    const trimmedName = typeof name === "string" ? name.trim() : "";
-
-    if (!trimmedName || !shoppingListId) {
-      return validationError("Name and shoppingListId are required");
+    // Check for idempotency key
+    const idempotencyKey = getIdempotencyKey(request);
+    if (idempotencyKey) {
+      const cached = checkIdempotencyKey(idempotencyKey);
+      if (cached) {
+        return successResponse(cached.data, "Item added to shopping list successfully (cached)", 201);
+      }
     }
+
+    const result = await validateRequest(request, addItemToShoppingListSchema);
+    if ('error' in result) return result.error;
+    
+    const { name, shoppingListId, categoryId, quantity = 1 } = result.data;
 
     const now = new Date();
 
     // Track frequency of adds with decay (centralized logic)
-    await incrementUsage(trimmedName, 1, now);
+    await incrementUsage(name, 1, now);
 
     // Find or create the GroceryItem (the product catalog entry)
     let groceryItem = await prisma.groceryItem.findFirst({
-      where: {
-        name: trimmedName,
-      },
+      where: { name },
     });
 
     if (!groceryItem) {
       // Create a new grocery item if it doesn't exist
       groceryItem = await prisma.groceryItem.create({
         data: {
-          name: trimmedName,
+          name,
           categoryId: categoryId || null,
         },
       });
@@ -89,6 +96,11 @@ export async function POST(request: Request) {
           },
         },
       });
+    }
+
+    // Store idempotency key
+    if (idempotencyKey) {
+      storeIdempotencyKey(idempotencyKey, shoppingListItem);
     }
 
     return successResponse(shoppingListItem, "Item added to shopping list successfully", 201);

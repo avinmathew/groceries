@@ -1,4 +1,4 @@
-import { successResponse, errorResponse, validationError, notFoundError, serverError, getErrorMessage } from '../lib/api-utils';
+import { successResponse, errorResponse, validationError, notFoundError, serverError, getErrorMessage } from '../lib/server/api-responses';
 
 // Mock Next.js NextResponse
 jest.mock('next/server', () => ({

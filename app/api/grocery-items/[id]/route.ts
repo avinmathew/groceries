@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { successResponse, notFoundError, serverError, getErrorMessage } from "@/lib/api-utils";
+import { successResponse, notFoundError, serverError, getErrorMessage } from "@/lib/server/api-responses";
+import { validateRequest } from "@/lib/server/validate-request";
+import { updateShoppingListItemSchema } from "@/lib/schemas/api-schemas";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -53,11 +55,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { name, quantity, notes, categoryId, status } = await request.json();
+    const result = await validateRequest(request, updateShoppingListItemSchema);
+    if ('error' in result) return result.error;
+    
+    const { name, quantity, notes, categoryId, status } = result.data;
 
     const updateData: any = {};
     if (quantity !== undefined) updateData.quantity = quantity;
-    if (notes !== undefined) updateData.notes = typeof notes === "string" ? notes.trim() || null : notes;
+    if (notes !== undefined) updateData.notes = notes;
     if (status !== undefined) {
       updateData.status = status;
       updateData.completedAt = status === 'completed' ? new Date() : null;
@@ -80,7 +85,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     // If name or categoryId changed, update the underlying grocery item
     if (name !== undefined || categoryId !== undefined) {
       const groceryUpdateData: any = {};
-      if (name !== undefined) groceryUpdateData.name = typeof name === "string" ? name.trim() : name;
+      if (name !== undefined) groceryUpdateData.name = name;
       if (categoryId !== undefined) groceryUpdateData.categoryId = categoryId || null;
       
       await prisma.groceryItem.update({

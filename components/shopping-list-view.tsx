@@ -11,7 +11,7 @@ import { GroceryItemRow } from "@/components/grocery-item-row";
 import { AddGroceryDialog } from "@/components/add-grocery-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSync } from "@/lib/sync-provider";
-import { offlineFetch, queueMutation } from "@/lib/api-utils";
+import { offlineFetch, queueMutation } from "@/lib/client/offline-fetch";
 import { offlineDB } from "@/lib/offline-db";
 import { BASE_PATH } from "@/lib/utils";
 
@@ -342,7 +342,8 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
           if (item) {
             await offlineDB.shoppingListItems.put({
               ...item,
-              completed: newStatus === 'completed',
+              status: newStatus,
+              completedAt: newStatus === 'completed' ? new Date().toISOString() : item.completedAt,
               updatedAt: new Date().toISOString(),
               _synced: false,
             });

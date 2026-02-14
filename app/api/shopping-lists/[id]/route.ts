@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { successResponse, notFoundError, serverError, getErrorMessage } from "@/lib/server/api-responses";
+import { validateRequest } from "@/lib/server/validate-request";
+import { updateShoppingListSchema } from "@/lib/schemas/api-schemas";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -200,21 +203,19 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { name } = await request.json();
-
-    const trimmedName = typeof name === "string" ? name.trim() : name;
+    const result = await validateRequest(request, updateShoppingListSchema);
+    if ('error' in result) return result.error;
+    
+    const { name } = result.data;
 
     const shoppingList = await prisma.shoppingList.update({
       where: { id: params.id },
-      data: {
-        ...(trimmedName && { name: trimmedName }),
-      },
+      data: { name },
     });
 
-    return NextResponse.json(shoppingList);
+    return successResponse(shoppingList, "Shopping list updated successfully");
   } catch (error) {
-    console.error("Error updating shopping list:", error);
-    return NextResponse.json({ error: "Failed to update shopping list" }, { status: 500 });
+    return serverError("Failed to update shopping list", getErrorMessage(error));
   }
 }
 
@@ -224,9 +225,8 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       where: { id: params.id },
     });
 
-    return NextResponse.json({ success: true });
+    return successResponse({ success: true }, "Shopping list deleted successfully");
   } catch (error) {
-    console.error("Error deleting shopping list:", error);
-    return NextResponse.json({ error: "Failed to delete shopping list" }, { status: 500 });
+    return serverError("Failed to delete shopping list", getErrorMessage(error));
   }
 }

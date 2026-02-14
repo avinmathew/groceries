@@ -244,7 +244,7 @@ describe('PATCH /api/shopping-lists/[id]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.name).toBe('Updated List');
+    expect(data.data.name).toBe('Updated List');
   });
 
   it('should return 500 when updating non-existent list', async () => {
@@ -281,7 +281,7 @@ describe('PATCH /api/shopping-lists/[id]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.name).toBe('New Name');
+    expect(data.data.name).toBe('New Name');
   });
 });
 
@@ -298,7 +298,7 @@ describe('DELETE /api/shopping-lists/[id]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
+    expect(data.data.success).toBe(true);
   });
 
   it('should handle deleting non-existent list', async () => {

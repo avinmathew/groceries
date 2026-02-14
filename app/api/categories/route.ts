@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { successResponse, validationError, serverError, getErrorMessage } from "@/lib/server/api-responses";
+import { validateRequest } from "@/lib/server/validate-request";
+import { createCategorySchema } from "@/lib/schemas/api-schemas";
+import { getIdempotencyKey, checkIdempotencyKey, storeIdempotencyKey } from "@/lib/server/idempotency";
 
 export async function GET() {
   try {
@@ -9,27 +13,32 @@ export async function GET() {
       },
     });
 
-    const response = NextResponse.json(categories);
+    const response = successResponse(categories);
     // Prevent caching in development - always fetch fresh data
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     response.headers.set('Pragma', 'no-cache');
     response.headers.set('Expires', '0');
     return response;
   } catch (error) {
-    console.error("Error fetching categories:", error);
-    return NextResponse.json({ error: "Failed to fetch categories" }, { status: 500 });
+    return serverError("Failed to fetch categories", getErrorMessage(error));
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const { name } = await request.json();
-
-    const trimmedName = typeof name === "string" ? name.trim() : "";
-
-    if (!trimmedName) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    // Check for idempotency key
+    const idempotencyKey = getIdempotencyKey(request);
+    if (idempotencyKey) {
+      const cached = checkIdempotencyKey(idempotencyKey);
+      if (cached) {
+        return successResponse(cached.data, "Category created successfully (cached)", 201);
+      }
     }
+
+    const result = await validateRequest(request, createCategorySchema);
+    if ('error' in result) return result.error;
+    
+    const { name } = result.data;
 
     // Get the highest order value
     const maxOrder = await prisma.category.findFirst({
@@ -39,14 +48,18 @@ export async function POST(request: Request) {
 
     const category = await prisma.category.create({
       data: {
-        name: trimmedName,
+        name,
         order: (maxOrder?.order ?? -1) + 1,
       },
     });
 
-    return NextResponse.json(category);
+    // Store idempotency key
+    if (idempotencyKey) {
+      storeIdempotencyKey(idempotencyKey, category);
+    }
+
+    return successResponse(category, "Category created successfully", 201);
   } catch (error) {
-    console.error("Error creating category:", error);
-    return NextResponse.json({ error: "Failed to create category" }, { status: 500 });
+    return serverError("Failed to create category", getErrorMessage(error));
   }
 }

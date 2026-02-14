@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { successResponse, validationError, serverError, getErrorMessage } from "@/lib/api-utils";
+import { successResponse, validationError, serverError, getErrorMessage } from "@/lib/server/api-responses";
+import { validateRequest } from "@/lib/server/validate-request";
+import { createShoppingListSchema } from "@/lib/schemas/api-schemas";
+import { getIdempotencyKey, checkIdempotencyKey, storeIdempotencyKey } from "@/lib/server/idempotency";
 
 export async function GET() {
   try {
@@ -33,19 +36,28 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { name } = await request.json();
-
-    const trimmedName = typeof name === "string" ? name.trim() : "";
-
-    if (!trimmedName) {
-      return validationError("Name is required");
+    // Check for idempotency key
+    const idempotencyKey = getIdempotencyKey(request);
+    if (idempotencyKey) {
+      const cached = checkIdempotencyKey(idempotencyKey);
+      if (cached) {
+        return successResponse(cached.data, "Shopping list created successfully (cached)", 201);
+      }
     }
+    
+    const result = await validateRequest(request, createShoppingListSchema);
+    if ('error' in result) return result.error;
+    
+    const { name } = result.data;
 
     const shoppingList = await prisma.shoppingList.create({
-      data: {
-        name: trimmedName,
-      },
+      data: { name },
     });
+
+    // Store idempotency key
+    if (idempotencyKey) {
+      storeIdempotencyKey(idempotencyKey, shoppingList);
+    }
 
     revalidatePath("/shopping-lists");
 

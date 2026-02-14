@@ -4,6 +4,7 @@ import Dexie, { Table } from 'dexie';
 export interface ShoppingList {
   id: string;
   name: string;
+  refreshStatus?: string; // 'idle' | 'refreshing'
   createdAt: string;
   updatedAt: string;
   _synced?: boolean;
@@ -13,8 +14,8 @@ export interface GroceryItem {
   id: string;
   name: string;
   categoryId: string | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   _synced?: boolean;
 }
 
@@ -24,9 +25,10 @@ export interface ShoppingListItem {
   groceryItemId: string;
   quantity: number;
   notes: string | null;
-  completed: boolean;
-  createdAt: string;
-  updatedAt: string;
+  status: string; // 'active' | 'watchlisted' | 'completed'
+  completedAt?: string | Date | null;
+  createdAt?: string;
+  updatedAt?: string;
   // Denormalized for display
   groceryItem?: GroceryItem;
   category?: Category;
@@ -38,8 +40,8 @@ export interface Category {
   id: string;
   name: string;
   displayOrder: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   _synced?: boolean;
 }
 
@@ -69,13 +71,14 @@ export interface PriceHistory {
 }
 
 export interface PendingMutation {
-  id: string; // client-generated UUID
+  id: string; // client-generated UUID (also used as idempotency key)
   method: 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   url: string;
   body?: any;
   timestamp: string;
   retries: number;
   error?: string;
+  idempotencyKey: string; // For server-side deduplication
 }
 
 export class OfflineDB extends Dexie {
@@ -89,6 +92,7 @@ export class OfflineDB extends Dexie {
 
   constructor() {
     super('GroceriesOfflineDB');
+    // Version 1: Original schema
     this.version(1).stores({
       shoppingLists: 'id, name, updatedAt',
       groceryItems: 'id, name, categoryId, updatedAt',
@@ -97,6 +101,27 @@ export class OfflineDB extends Dexie {
       productLinks: 'id, groceryItemId, store, updatedAt',
       priceHistory: 'id, productLinkId, scrapedAt',
       pendingMutations: 'id, timestamp, url',
+    });
+    
+    // Version 2: Update schema to match Prisma (status replaces completed, add refreshStatus)
+    this.version(2).stores({
+      shoppingLists: 'id, name, refreshStatus, updatedAt',
+      groceryItems: 'id, name, categoryId, updatedAt',
+      shoppingListItems: 'id, shoppingListId, groceryItemId, status, updatedAt',
+      categories: 'id, name, displayOrder, updatedAt',
+      productLinks: 'id, groceryItemId, store, updatedAt',
+      priceHistory: 'id, productLinkId, scrapedAt',
+      pendingMutations: 'id, timestamp, url',
+    }).upgrade(async (tx) => {
+      // Migrate completed boolean to status string
+      const items = await tx.table('shoppingListItems').toArray();
+      for (const item of items) {
+        if ('completed' in item) {
+          (item as any).status = (item as any).completed ? 'completed' : 'active';
+          delete (item as any).completed;
+          await tx.table('shoppingListItems').put(item);
+        }
+      }
     });
   }
 }

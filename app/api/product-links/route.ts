@@ -1,47 +1,43 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { successResponse, validationError, serverError, getErrorMessage } from "@/lib/server/api-responses";
+import { validateRequest } from "@/lib/server/validate-request";
+import { createProductLinkSchema } from "@/lib/schemas/api-schemas";
+import { getIdempotencyKey, checkIdempotencyKey, storeIdempotencyKey } from "@/lib/server/idempotency";
 
 export async function POST(request: Request) {
   try {
-    const { url, store, groceryItemId, label, perUnit } = await request.json();
-
-    const trimmedUrl = typeof url === "string" ? url.trim() : "";
-
-    if (!trimmedUrl || !store || !groceryItemId) {
-      return NextResponse.json(
-        { error: "url, store, and groceryItemId are required" },
-        { status: 400 }
-      );
-    }
-
-    if (!["woolworths", "coles", "aldi"].includes(store)) {
-      return NextResponse.json({ error: "Invalid store" }, { status: 400 });
-    }
-
-    const trimmedLabel = typeof label === "string" ? label.trim() : null;
-
-    let parsedPerUnit: number | null = null;
-    if (perUnit !== undefined && perUnit !== null && perUnit !== "") {
-      const numericPerUnit = Number(perUnit);
-      if (!Number.isFinite(numericPerUnit) || numericPerUnit <= 0) {
-        return NextResponse.json({ error: "perUnit must be a positive number" }, { status: 400 });
+    // Check for idempotency key
+    const idempotencyKey = getIdempotencyKey(request);
+    if (idempotencyKey) {
+      const cached = checkIdempotencyKey(idempotencyKey);
+      if (cached) {
+        return successResponse(cached.data, "Product link created successfully (cached)", 201);
       }
-      parsedPerUnit = numericPerUnit;
     }
+
+    const result = await validateRequest(request, createProductLinkSchema);
+    if ('error' in result) return result.error;
+    
+    const { url, store, groceryItemId, label, perUnit } = result.data;
 
     const productLink = await prisma.productLink.create({
       data: {
-        url: trimmedUrl,
+        url,
         store,
         groceryItemId,
-        label: trimmedLabel || null,
-        perUnit: parsedPerUnit,
+        label: label || null,
+        perUnit: perUnit || null,
       },
     });
 
-    return NextResponse.json(productLink);
+    // Store idempotency key
+    if (idempotencyKey) {
+      storeIdempotencyKey(idempotencyKey, productLink);
+    }
+
+    return successResponse(productLink, "Product link created successfully", 201);
   } catch (error) {
-    console.error("Error creating product link:", error);
-    return NextResponse.json({ error: "Failed to create product link" }, { status: 500 });
+    return serverError("Failed to create product link", getErrorMessage(error));
   }
 }

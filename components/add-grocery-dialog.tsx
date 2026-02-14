@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSync } from "@/lib/sync-provider";
-import { offlineFetch, queueMutation } from "@/lib/api-utils";
+import { offlineFetch, queueMutation } from "@/lib/client/offline-fetch";
 import { offlineDB } from "@/lib/offline-db";
 import { BASE_PATH } from "@/lib/utils";
 
@@ -96,7 +96,8 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
             groceryItemId: tempId,
             quantity: 1,
             notes: null,
-            completed: false,
+            status: 'active',
+            completedAt: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             _synced: false,

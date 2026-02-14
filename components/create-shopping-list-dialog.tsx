@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useSync } from "@/lib/sync-provider";
-import { queueMutation } from "@/lib/api-utils";
+import { queueMutation } from "@/lib/client/offline-fetch";
 import { offlineDB } from "@/lib/offline-db";
 import { BASE_PATH } from "@/lib/utils";
 

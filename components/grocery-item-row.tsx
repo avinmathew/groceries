@@ -182,17 +182,7 @@ export function GroceryItemRow({
           <GripVertical className="h-4 w-4" />
         </Button>
       )}
-      
-      {/* Status badge - shows only in edit mode for non-active items */}
-      {isEditMode && item.status !== 'active' && (
-        <Badge 
-          variant={item.status === 'watchlisted' ? 'default' : 'secondary'}
-          className={item.status === 'watchlisted' ? 'bg-blue-600' : ''}
-        >
-          {item.status === 'watchlisted' ? 'Watch' : 'Done'}
-        </Badge>
-      )}
-      
+            
       <button
         onClick={onToggleComplete}
         className="flex-1 text-left"

@@ -1,24 +1,28 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { successResponse, serverError, getErrorMessage } from "@/lib/server/api-responses";
+import { validateRequest } from "@/lib/server/validate-request";
+import { updateCategorySchema } from "@/lib/schemas/api-schemas";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { name, order } = await request.json();
+    const result = await validateRequest(request, updateCategorySchema);
+    if ('error' in result) return result.error;
+    
+    const { name, order } = result.data;
 
-    const trimmedName = typeof name === "string" ? name.trim() : name;
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (order !== undefined) updateData.order = order;
 
     const category = await prisma.category.update({
       where: { id: params.id },
-      data: {
-        ...(trimmedName && { name: trimmedName }),
-        ...(order !== undefined && { order }),
-      },
+      data: updateData,
     });
 
-    return NextResponse.json(category);
+    return successResponse(category, "Category updated successfully");
   } catch (error) {
-    console.error("Error updating category:", error);
-    return NextResponse.json({ error: "Failed to update category" }, { status: 500 });
+    return serverError("Failed to update category", getErrorMessage(error));
   }
 }
 
@@ -28,9 +32,8 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       where: { id: params.id },
     });
 
-    return NextResponse.json({ success: true });
+    return successResponse({ success: true }, "Category deleted successfully");
   } catch (error) {
-    console.error("Error deleting category:", error);
-    return NextResponse.json({ error: "Failed to delete category" }, { status: 500 });
+    return serverError("Failed to delete category", getErrorMessage(error));
   }
 }

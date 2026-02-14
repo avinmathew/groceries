@@ -94,7 +94,7 @@ describe('POST /api/grocery-items', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toContain('Name and shoppingListId are required');
+    expect(data.error).toContain('Name is required');
   });
 
   it('should return validation error for invalid JSON', async () => {
@@ -106,8 +106,8 @@ describe('POST /api/grocery-items', () => {
     const response = await POST(request);
     const data = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(data.error).toContain('Failed to add item to shopping list');
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('Invalid request body');
   });
 
   it('should handle database errors gracefully', async () => {

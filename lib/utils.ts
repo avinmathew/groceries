@@ -5,7 +5,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const BASE_PATH = process.env.__NEXT_ROUTER_BASEPATH;
+// __NEXT_ROUTER_BASEPATH is set by Next.js from next.config.mjs basePath
+// This is the recommended way to access basePath in client components
+export const BASE_PATH = process.env.__NEXT_ROUTER_BASEPATH || '';
 
 /**
  * Get the most recent Wednesday at 00:00:00 (including today if today is Wednesday)

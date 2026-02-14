@@ -1,3 +1,6 @@
+// NOTE: Keep this in sync with basePath in next.config.mjs
+// Service workers cannot access environment variables, so this must be hardcoded
+// TODO: Consider using a build script to inject this value
 const BASE_PATH = '/groceries';
 const CACHE_VERSION = 'v6';
 const CACHE_NAME = `mygroceries-${CACHE_VERSION}`;
