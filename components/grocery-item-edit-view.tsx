@@ -339,7 +339,9 @@ export function GroceryItemEditView({
 
       if (!response.ok) return;
       const data = await response.json();
-      const refreshedLinks = data.data?.productLinks ?? data.productLinks ?? [];
+      // Handle both shopping list item response (data.groceryItem.productLinks) 
+      // and grocery item response (data.productLinks)
+      const refreshedLinks = data.data?.groceryItem?.productLinks ?? data.data?.productLinks ?? data.productLinks ?? [];
       setProductLinks(refreshedLinks);
     } catch (error) {
       console.error("Error refreshing product links:", error);
@@ -485,7 +487,8 @@ export function GroceryItemEditView({
 
       if (!response.ok) throw new Error("Failed to update product link");
 
-      const updatedLink = await response.json();
+      const result = await response.json();
+      const updatedLink = result.data || result;
       setProductLinks((prev) => prev.map((link) => (link.id === updatedLink.id ? updatedLink : link)));
       return true;
     } catch (error) {
@@ -544,7 +547,8 @@ export function GroceryItemEditView({
 
       if (!response.ok) throw new Error("Failed to add product link");
 
-      const newLink = await response.json();
+      const result = await response.json();
+      const newLink = result.data || result;
       setProductLinks((prev) => [...prev, newLink]);
       toast({
         title: "Success",
