@@ -112,6 +112,7 @@ interface StoreConfig {
   containerSelectors?: string[];
   priceRange: { min: number; max: number };
   localStorage?: Record<string, string>;
+  cookies?: Array<{ name: string; value: string; domain: string }>;
 }
 
 const STORE_CONFIGS: Record<Store, StoreConfig> = {
@@ -163,6 +164,9 @@ const STORE_CONFIGS: Record<Store, StoreConfig> = {
     localStorage: {
       "merchant-selection": '{"confirmedByUser":true,"merchantId":"G132","service":"walk-in"}',
     },
+    cookies: [
+      { name: 'merchant-selection', value: '{"confirmedByUser":true,"merchantId":"G132","service":"walk-in"}', domain: '.aldi.com.au' },
+    ],
   },
 };
 
@@ -177,10 +181,16 @@ function extractPrice(text: string): number | null {
 }
 
 // Generic price extraction from page using JavaScript
-async function extractPricesFromPage(page: Page, config: StoreConfig): Promise<{ current?: string; was?: string; }> {
+async function extractPricesFromPage(page: Page, config: StoreConfig): Promise<{ current?: string; was?: string; debug?: any }> {
   try {
     return await page.evaluate((cfg) => {
-      const result: { current?: string; was?: string; } = {};
+      const result: { current?: string; was?: string; debug?: any } = {};
+      const debugInfo: any = {
+        foundContainers: 0,
+        foundPriceElements: 0,
+        priceTexts: [],
+        containerFound: false,
+      };
     
       // Helper to check if text contains a valid price
       const isValidPrice = (text: string, min: number, max: number): boolean => {
@@ -196,7 +206,11 @@ async function extractPricesFromPage(page: Page, config: StoreConfig): Promise<{
       if (cfg.containerSelectors) {
         cfg.containerSelectors.forEach(selector => {
           const container = document.querySelector(selector);
-          if (container) searchAreas.push(container);
+          if (container) {
+            searchAreas.push(container);
+            debugInfo.foundContainers++;
+            debugInfo.containerFound = true;
+          }
         });
       }
       if (searchAreas.length === 0) {
@@ -207,8 +221,12 @@ async function extractPricesFromPage(page: Page, config: StoreConfig): Promise<{
       for (const area of searchAreas) {
         for (const selector of cfg.priceSelectors) {
           const elements = area.querySelectorAll(selector);
+          debugInfo.foundPriceElements += elements.length;
+          
           for (const element of Array.from(elements)) {
             const text = element.textContent?.trim() || "";
+            debugInfo.priceTexts.push(text);
+            
             if (isValidPrice(text, cfg.priceRange.min, cfg.priceRange.max)) {
               result.current = text;
               break;
@@ -218,6 +236,9 @@ async function extractPricesFromPage(page: Page, config: StoreConfig): Promise<{
         }
         if (result.current) break;
       }
+      
+      result.debug = debugInfo;      
+      result.debug = debugInfo;
 
       // Find "was" price
       if (cfg.wasSelectors.length > 0) {
@@ -447,6 +468,11 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
           delete Object.getPrototypeOf(navigator).webdriver;
       });
 
+      // Set cookies if configured
+      if (config.cookies) {
+        await page.setCookie(...config.cookies);
+      }
+
       // Set localStorage before navigation if configured
       if (config.localStorage) {
         await page.evaluateOnNewDocument((localStorageData) => {
@@ -480,6 +506,12 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
       const extractedPrices = await extractPricesFromPage(page, config);
       console.log(`[Price Scraper] ${store} Extracted from page:`, extractedPrices);
       
+      // For Aldi, save debug artifacts if no price found
+      if (store === 'aldi' && !extractedPrices.current) {
+        console.warn(`[Price Scraper] ${store} No price found. Debug info:`, extractedPrices.debug);
+        await saveDebugArtifacts(page, store, "no-price-found");
+      }
+      
       // Get HTML for fallback parsing
       const html = await page.content();
       await page.close();
@@ -504,6 +536,23 @@ export async function scrapePrice(url: string, store: Store): Promise<PriceData>
       // Fallback to HTML parsing
       console.log(`[Price Scraper] ${store} Falling back to HTML parsing`);
       const $ = cheerio.load(html);
+      
+      // For Aldi specifically, try a broader search if structured parsing fails
+      if (store === 'aldi') {
+        // Check if page has "Select your store" or other indicators that merchant selection failed
+        const pageText = $('body').text();
+        if (pageText.toLowerCase().includes('select your store') || 
+            pageText.toLowerCase().includes('choose a store')) {
+          console.warn('[Price Scraper] Aldi page appears to be showing store selection prompt');
+        }
+        
+        // Try to find any price-like pattern on the page as fallback
+        const pricePattern = /\$?\s*\d+\.\d{2}/g;
+        const matches = pageText.match(pricePattern);
+        if (matches && matches.length > 0) {
+          console.log(`[Price Scraper] ${store} Found ${matches.length} price-like patterns:`, matches.slice(0, 5));
+        }
+      }
       
       // Check for JSON-LD to extract prices
       const jsonLdData = parseJsonLd($);
