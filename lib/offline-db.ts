@@ -4,7 +4,6 @@ import Dexie, { Table } from 'dexie';
 export interface ShoppingList {
   id: string;
   name: string;
-  refreshStatus?: string; // 'idle' | 'refreshing'
   createdAt: string;
   updatedAt: string;
   _synced?: boolean;
@@ -103,7 +102,7 @@ export class OfflineDB extends Dexie {
       pendingMutations: 'id, timestamp, url',
     });
     
-    // Version 2: Update schema to match Prisma (status replaces completed, add refreshStatus)
+    // Version 2: Update schema to match Prisma (status replaces completed)
     this.version(2).stores({
       shoppingLists: 'id, name, refreshStatus, updatedAt',
       groceryItems: 'id, name, categoryId, updatedAt',
@@ -122,6 +121,17 @@ export class OfflineDB extends Dexie {
           await tx.table('shoppingListItems').put(item);
         }
       }
+    });
+
+    // Version 3: Drop refreshStatus from shopping lists
+    this.version(3).stores({
+      shoppingLists: 'id, name, updatedAt',
+      groceryItems: 'id, name, categoryId, updatedAt',
+      shoppingListItems: 'id, shoppingListId, groceryItemId, status, updatedAt',
+      categories: 'id, name, displayOrder, updatedAt',
+      productLinks: 'id, groceryItemId, store, updatedAt',
+      priceHistory: 'id, productLinkId, scrapedAt',
+      pendingMutations: 'id, timestamp, url',
     });
   }
 }

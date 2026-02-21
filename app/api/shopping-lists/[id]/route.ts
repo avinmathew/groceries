@@ -182,7 +182,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
     return NextResponse.json({
       id: shoppingList.id,
       name: shoppingList.name,
-      refreshStatus: shoppingList.refreshStatus,
       categoryGroups,
       watchlistItems: formattedWatchlistItems,
       completedItems: formattedCompletedItems,

@@ -233,8 +233,28 @@ export function GroceryItemEditView({
   const [priceHistory, setPriceHistory] = useState<PriceHistoryEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const refreshPollingRef = useRef(false);
+  const refreshPollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+
+  const stopRefreshPolling = useCallback(() => {
+    refreshPollingRef.current = false;
+    if (refreshPollTimerRef.current) {
+      clearTimeout(refreshPollTimerRef.current);
+      refreshPollTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    setProductLinks(initialItem.productLinks);
+  }, [initialItem.productLinks]);
+
+  useEffect(() => {
+    return () => {
+      stopRefreshPolling();
+    };
+  }, [stopRefreshPolling]);
 
   const perUnitBase = useMemo(() => {
     const perUnits = productLinks
@@ -659,7 +679,10 @@ export function GroceryItemEditView({
   };
 
   const handleRefreshPrices = async () => {
+    stopRefreshPolling();
+    refreshPollingRef.current = true;
     setIsRefreshing(true);
+
     try {
       // Start the refresh process in the background (returns immediately)
       const response = await fetch(`${BASE_PATH}/api/refresh-prices`, {
@@ -669,6 +692,12 @@ export function GroceryItemEditView({
       });
 
       if (!response.ok) throw new Error("Failed to start price refresh");
+
+      const payload = await response.json();
+      const jobId: string | null = payload?.jobId ?? payload?.data?.jobId ?? null;
+      if (!jobId) {
+        throw new Error("Refresh job ID was not returned");
+      }
 
       // Show immediate feedback
       toast({
@@ -682,38 +711,72 @@ export function GroceryItemEditView({
       const startTime = Date.now();
       
       const pollForUpdates = async () => {
+        if (!refreshPollingRef.current) return;
+
         const elapsed = Date.now() - startTime;
+        let statusReachedTerminal = false;
+        let statusFailed = false;
+
+        try {
+          const statusResponse = await fetch(`${BASE_PATH}/api/refresh-prices/${jobId}`, {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          });
+
+          if (statusResponse.ok) {
+            const statusPayload = await statusResponse.json();
+            const statusData = statusPayload?.data ?? statusPayload;
+            const refreshStatus = statusData?.status;
+            statusReachedTerminal = refreshStatus === 'completed' || refreshStatus === 'failed';
+            statusFailed = refreshStatus === 'failed';
+          }
+        } catch (statusError) {
+          console.error('Error fetching refresh status:', statusError);
+        }
         
         // Fetch updated data
-        const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.groceryItemId}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
-        });
-        if (updatedItemResponse.ok) {
-          const updatedItem = await updatedItemResponse.json();
-          const refreshedLinks = updatedItem.data?.productLinks ?? updatedItem.productLinks ?? [];
-          setProductLinks(refreshedLinks);
+        try {
+          const updatedItemResponse = await fetch(`${BASE_PATH}/api/grocery-items/${initialItem.groceryItemId}`, {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          });
+
+          if (updatedItemResponse.ok) {
+            const updatedItem = await updatedItemResponse.json();
+            const refreshedLinks = updatedItem.data?.groceryItem?.productLinks ?? updatedItem.data?.productLinks ?? updatedItem.productLinks ?? [];
+            setProductLinks(refreshedLinks);
+          }
           await loadPriceHistory();
+        } catch (refreshError) {
+          console.error('Error polling refreshed prices:', refreshError);
         }
 
-        // Continue polling if we haven't exceeded max duration
-        if (elapsed < maxDuration && isRefreshing) {
-          setTimeout(pollForUpdates, pollInterval);
-        } else {
+        // Deterministic completion with job status, with timeout safety guard
+        if (statusReachedTerminal || elapsed >= maxDuration) {
+          stopRefreshPolling();
           setIsRefreshing(false);
           toast({
-            title: "Success",
-            description: "Price refresh complete",
+            title: statusFailed ? "Error" : "Success",
+            description: statusFailed ? "Price refresh ended with errors" : "Price refresh complete",
+            variant: statusFailed ? "destructive" : "default",
           });
           router.refresh();
+          return;
+        }
+
+        if (refreshPollingRef.current) {
+          refreshPollTimerRef.current = setTimeout(pollForUpdates, pollInterval);
         }
       };
 
       // Start polling after initial delay
-      setTimeout(pollForUpdates, pollInterval);
+      refreshPollTimerRef.current = setTimeout(pollForUpdates, pollInterval);
     } catch (error) {
+      stopRefreshPolling();
       toast({
         title: "Error",
         description: "Failed to refresh prices",

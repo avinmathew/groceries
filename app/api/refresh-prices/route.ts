@@ -7,9 +7,25 @@ type RefreshScope =
   | { type: 'multiple'; itemIds: string[] }
   | { type: 'all' };
 
+type RefreshRequestBody = {
+  groceryItemId?: string;
+  groceryItemIds?: string[];
+  shoppingListId?: string;
+};
+
+type RefreshableLink = {
+  id: string;
+  url: string;
+  store: string;
+  regularPrice: number | null;
+  discountPrice: number | null;
+  lastRefreshed: Date | null;
+  groceryItemId: string;
+};
+
 export async function POST(request: Request) {
   try {
-    const { groceryItemId, groceryItemIds, shoppingListId } = await request.json();
+    const { groceryItemId, groceryItemIds, shoppingListId } = (await request.json()) as RefreshRequestBody;
 
     let scope: RefreshScope;
     if (groceryItemId) {
@@ -20,37 +36,20 @@ export async function POST(request: Request) {
       scope = { type: 'all' };
     }
 
-    // Mark shopping list as refreshing if provided
-    if (shoppingListId) {
-      await prisma.shoppingList.update({
-        where: { id: shoppingListId },
-        data: { refreshStatus: 'refreshing' },
-      }).catch(err => console.error('Failed to mark list as refreshing:', err));
-    }
+    const { jobId, links } = await createRefreshJob(scope, shoppingListId);
 
     // Start the refresh process in the background (fire and forget)
     // This allows the response to return immediately so the UI can start polling
-    refreshPrices(scope)
+    runRefreshJob(jobId, links)
       .then(() => {
-        console.log('Price refresh completed successfully');
+        console.log(`Price refresh completed successfully for job ${jobId}`);
       })
       .catch((error) => {
-        console.error("Background price refresh error:", error);
-      })
-      .finally(async () => {
-        // Mark shopping list as idle when done
-        if (shoppingListId) {
-          await prisma.shoppingList.update({
-            where: { id: shoppingListId },
-            data: { refreshStatus: 'idle' },
-          }).catch(err => console.error('Failed to mark list as idle:', err));
-        }
-        // Always close browser after all scraping is done
-        await closeBrowser();
+        console.error(`Background price refresh error for job ${jobId}:`, error);
       });
 
     // Return immediately so client can start polling
-    return NextResponse.json({ success: true, message: 'Price refresh started' });
+    return NextResponse.json({ success: true, message: 'Price refresh started', jobId });
   } catch (error) {
     console.error("Error starting price refresh:", error);
     return NextResponse.json({ error: "Failed to start price refresh" }, { status: 500 });
@@ -76,7 +75,7 @@ function getLastWednesday(): Date {
 async function updateProductLink(
   link: { id: string; regularPrice: number | null; discountPrice: number | null },
   priceData: { regularPrice: number | null; discountPrice: number | null }
-): Promise<any> {
+): Promise<{ regularPrice: number | null; discountPrice: number | null }> {
   const priceChanged = 
     link.regularPrice !== priceData.regularPrice || 
     link.discountPrice !== priceData.discountPrice;
@@ -84,7 +83,7 @@ async function updateProductLink(
   const shouldSaveHistory = priceChanged || link.regularPrice === null;
 
   // Update the product link
-  const updatedLink = await prisma.productLink.update({
+  await prisma.productLink.update({
     where: { id: link.id },
     data: {
       regularPrice: priceData.regularPrice,
@@ -105,16 +104,22 @@ async function updateProductLink(
     });
   }
 
-  return updatedLink;
+  return {
+    regularPrice: priceData.regularPrice,
+    discountPrice: priceData.discountPrice,
+  };
 }
 
 /**
- * Main refresh function with strategy pattern
+ * Build links to refresh from requested scope
  */
-async function refreshPrices(scope: RefreshScope): Promise<any[]> {
+async function getLinksToRefresh(scope: RefreshScope): Promise<RefreshableLink[]> {
   // Build query based on scope
   const lastWednesday = getLastWednesday();
-  let whereClause: any = {
+  const whereClause: {
+    OR: Array<{ lastRefreshed: null } | { lastRefreshed: { lt: Date } }>;
+    groceryItemId?: { in: string[] };
+  } = {
     OR: [
       { lastRefreshed: null },
       { lastRefreshed: { lt: lastWednesday } },
@@ -138,7 +143,7 @@ async function refreshPrices(scope: RefreshScope): Promise<any[]> {
       return hasNoPrice || shouldRefreshPrice(link.lastRefreshed);
     });
 
-    return await processLinks(linksToRefresh);
+    return linksToRefresh;
   }
 
   if (scope.type === 'multiple') {
@@ -148,25 +153,99 @@ async function refreshPrices(scope: RefreshScope): Promise<any[]> {
   // Fetch links that need refresh
   const links = await prisma.productLink.findMany({ where: whereClause });
 
-  return await processLinks(links);
+  return links;
+}
+
+/**
+ * Create persisted refresh job and link snapshots
+ */
+async function createRefreshJob(
+  scope: RefreshScope,
+  shoppingListId?: string
+): Promise<{ jobId: string; links: RefreshableLink[] }> {
+  const links = await getLinksToRefresh(scope);
+
+  const job = await prisma.refreshJob.create({
+    data: {
+      status: 'running',
+      scopeType: scope.type,
+      shoppingListId: shoppingListId ?? null,
+      groceryItemId: scope.type === 'single' ? scope.itemId : null,
+      totalLinks: links.length,
+      startedAt: new Date(),
+    },
+  });
+
+  if (links.length > 0) {
+    await prisma.refreshJobLink.createMany({
+      data: links.map((link) => ({
+        refreshJobId: job.id,
+        productLinkId: link.id,
+        groceryItemId: link.groceryItemId,
+        store: link.store,
+        status: 'pending',
+      })),
+    });
+  }
+
+  return { jobId: job.id, links };
+}
+
+async function runRefreshJob(
+  jobId: string,
+  links: RefreshableLink[]
+): Promise<void> {
+  try {
+    if (links.length === 0) {
+      await prisma.refreshJob.update({
+        where: { id: jobId },
+        data: {
+          status: 'completed',
+          finishedAt: new Date(),
+        },
+      });
+      return;
+    }
+
+    await processLinks(jobId, links);
+
+    const finalCounts = await prisma.refreshJob.findUnique({
+      where: { id: jobId },
+      select: { failedLinks: true },
+    });
+    const hasFailures = (finalCounts?.failedLinks ?? 0) > 0;
+
+    await prisma.refreshJob.update({
+      where: { id: jobId },
+      data: {
+        status: hasFailures ? 'failed' : 'completed',
+        error: hasFailures ? `${finalCounts?.failedLinks ?? 0} link(s) failed to refresh` : null,
+        finishedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    await prisma.refreshJob.update({
+      where: { id: jobId },
+      data: {
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unknown refresh error',
+        finishedAt: new Date(),
+      },
+    }).catch((updateError) => {
+      console.error(`Failed to mark job ${jobId} as failed:`, updateError);
+    });
+  } finally {
+    await closeBrowser();
+  }
 }
 
 /**
  * Process and scrape prices for a list of links
  */
-async function processLinks(
-  links: Array<{
-    id: string;
-    url: string;
-    store: string;
-    regularPrice: number | null;
-    discountPrice: number | null;
-    lastRefreshed: Date | null;
-  }>
-): Promise<any[]> {
+async function processLinks(jobId: string, links: RefreshableLink[]): Promise<void> {
   const rateLimitMs = process.env.NODE_ENV === 'test' ? 0 : 5000;
   // Group links by store for parallel processing
-  const linksByStore = new Map<string, typeof links>();
+  const linksByStore = new Map<string, RefreshableLink[]>();
   links.forEach(link => {
     if (!linksByStore.has(link.store)) {
       linksByStore.set(link.store, []);
@@ -174,27 +253,92 @@ async function processLinks(
     linksByStore.get(link.store)!.push(link);
   });
 
-  const updatedLinks: any[] = [];
-
   // Process stores in parallel, links within each store sequentially
   // Note: Prices are stored in DB immediately after scraping (not batched at the end)
   await Promise.all(
     Array.from(linksByStore.entries()).map(async ([store, storeLinks]) => {
       for (const link of storeLinks) {
+        const now = new Date();
+
+        await prisma.refreshJobLink.update({
+          where: {
+            refreshJobId_productLinkId: {
+              refreshJobId: jobId,
+              productLinkId: link.id,
+            },
+          },
+          data: {
+            status: 'running',
+            startedAt: now,
+          },
+        });
+
         try {
           const priceData = await scrapePrice(link.url, link.store as any);
+          let persistedPrice: { regularPrice: number | null; discountPrice: number | null } = {
+            regularPrice: null,
+            discountPrice: null,
+          };
 
           if (priceData.regularPrice !== null || priceData.discountPrice !== null) {
             // Immediately persist to database so UI polling can pick it up
-            const updated = await updateProductLink(link, priceData);
+            persistedPrice = await updateProductLink(link, priceData);
             console.log(`Stored price for link ${link.id}: regular=${priceData.regularPrice}, discount=${priceData.discountPrice}`);
-            updatedLinks.push(updated);
-
           } else {
             console.log(`No price data extracted for link ${link.id}`);
           }
+
+          await prisma.$transaction([
+            prisma.refreshJobLink.update({
+              where: {
+                refreshJobId_productLinkId: {
+                  refreshJobId: jobId,
+                  productLinkId: link.id,
+                },
+              },
+              data: {
+                status: 'completed',
+                finishedAt: new Date(),
+                regularPrice: persistedPrice.regularPrice,
+                discountPrice: persistedPrice.discountPrice,
+                error: null,
+              },
+            }),
+            prisma.refreshJob.update({
+              where: { id: jobId },
+              data: {
+                processedLinks: { increment: 1 },
+                successfulLinks: { increment: 1 },
+              },
+            }),
+          ]);
         } catch (error) {
           console.error(`Error refreshing price for link ${link.id}:`, error);
+
+          const errorMessage = error instanceof Error ? error.message : 'Failed to refresh link';
+          await prisma.$transaction([
+            prisma.refreshJobLink.update({
+              where: {
+                refreshJobId_productLinkId: {
+                  refreshJobId: jobId,
+                  productLinkId: link.id,
+                },
+              },
+              data: {
+                status: 'failed',
+                finishedAt: new Date(),
+                error: errorMessage,
+              },
+            }),
+            prisma.refreshJob.update({
+              where: { id: jobId },
+              data: {
+                processedLinks: { increment: 1 },
+                failedLinks: { increment: 1 },
+              },
+            }),
+          ]);
+
           // Continue with other links even if one fails
         }
 
@@ -205,6 +349,4 @@ async function processLinks(
       }
     })
   );
-
-  return updatedLinks;
 }

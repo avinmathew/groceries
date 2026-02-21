@@ -13,11 +13,11 @@ datasource db {
 model ShoppingList {
   id              String   @id @default(cuid())
   name            String
-  refreshStatus   String   @default("idle") // idle, refreshing
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  items ShoppingListItem[]
+  items        ShoppingListItem[]
+  refreshJobs  RefreshJob[]
 
   @@map("shopping_lists")
 }
@@ -41,9 +41,11 @@ model GroceryItem {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  category         Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  productLinks     ProductLink[]
+  category          Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  productLinks      ProductLink[]
   shoppingListItems ShoppingListItem[]
+  refreshJobs       RefreshJob[]
+  refreshJobLinks   RefreshJobLink[]
 
   @@map("grocery_items")
 }
@@ -90,10 +92,62 @@ model ProductLink {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  groceryItem   GroceryItem @relation(fields: [groceryItemId], references: [id], onDelete: Cascade)
-  priceHistory  PriceHistory[]
+  groceryItem      GroceryItem      @relation(fields: [groceryItemId], references: [id], onDelete: Cascade)
+  priceHistory     PriceHistory[]
+  refreshJobLinks  RefreshJobLink[]
 
   @@map("product_links")
+}
+
+model RefreshJob {
+  id              String   @id @default(cuid())
+  status          String   @default("running") // running, completed, failed
+  scopeType       String   // single, multiple, all
+  shoppingListId  String?
+  groceryItemId   String?
+  totalLinks      Int      @default(0)
+  processedLinks  Int      @default(0)
+  successfulLinks Int      @default(0)
+  failedLinks     Int      @default(0)
+  error           String?
+  startedAt       DateTime @default(now())
+  finishedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shoppingList ShoppingList? @relation(fields: [shoppingListId], references: [id], onDelete: SetNull)
+  groceryItem  GroceryItem?  @relation(fields: [groceryItemId], references: [id], onDelete: SetNull)
+  links        RefreshJobLink[]
+
+  @@index([status, createdAt])
+  @@index([shoppingListId, status])
+  @@index([groceryItemId, status])
+  @@map("refresh_jobs")
+}
+
+model RefreshJobLink {
+  id            String   @id @default(cuid())
+  refreshJobId  String
+  productLinkId String
+  groceryItemId String
+  store         String
+  status        String   @default("pending") // pending, running, completed, failed
+  error         String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  regularPrice  Float?
+  discountPrice Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  refreshJob  RefreshJob  @relation(fields: [refreshJobId], references: [id], onDelete: Cascade)
+  productLink ProductLink @relation(fields: [productLinkId], references: [id], onDelete: Cascade)
+  groceryItem GroceryItem @relation(fields: [groceryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([refreshJobId, productLinkId])
+  @@index([refreshJobId, status])
+  @@index([groceryItemId, status])
+  @@map("refresh_job_links")
 }
 
 model PriceHistory {

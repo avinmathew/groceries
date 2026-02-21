@@ -135,7 +135,6 @@ export async function cacheResponse(url: string, data: any): Promise<void> {
         await offlineDB.shoppingLists.put({
           id: responseData.id,
           name: responseData.name,
-          refreshStatus: responseData.refreshStatus,
           createdAt: responseData.createdAt,
           updatedAt: responseData.updatedAt,
           _synced: true,
@@ -381,7 +380,6 @@ export async function getCachedResponse<T>(url: string): Promise<T | null> {
       return {
         id: list.id,
         name: list.name,
-        refreshStatus: list.refreshStatus || 'idle',
         categoryGroups,
         watchlistItems,
         completedItems,

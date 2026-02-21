@@ -176,7 +176,6 @@ async function getShoppingList(id: string) {
   return {
     id: shoppingList.id,
     name: shoppingList.name,
-    refreshStatus: shoppingList.refreshStatus,
     createdAt: shoppingList.createdAt.toISOString(),
     updatedAt: shoppingList.updatedAt.toISOString(),
     categoryGroups: serializedCategoryGroups,

@@ -5,7 +5,6 @@ import {
   createGroceryItem,
   addItemToList,
   createProductLink,
-  updateShoppingListRefreshStatus,
 } from './seed';
 import { clearClientState, setupDebugging } from './test-utils';
 
@@ -35,15 +34,28 @@ test('refresh prices from list triggers request and completes (mocked)', async (
   });
 
   await page.route('**/api/refresh-prices', async (route) => {
-    await updateShoppingListRefreshStatus(weekly.id, 'refreshing');
-    setTimeout(() => {
-      void updateShoppingListRefreshStatus(weekly.id, 'idle');
-    }, 500);
-
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ success: true, message: 'Price refresh started' }),
+      body: JSON.stringify({ success: true, message: 'Price refresh started', jobId: 'test-job-id' }),
+    });
+  });
+
+  await page.route('**/api/refresh-prices/test-job-id', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          id: 'test-job-id',
+          status: 'completed',
+          totalLinks: 1,
+          processedLinks: 1,
+          successfulLinks: 1,
+          failedLinks: 0,
+        },
+      }),
     });
   });
 

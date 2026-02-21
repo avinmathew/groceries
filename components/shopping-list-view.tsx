@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -18,7 +18,6 @@ import { BASE_PATH } from "@/lib/utils";
 type ShoppingList = {
   id: string;
   name: string;
-  refreshStatus?: string;
   categoryGroups: Array<{
     category: { id: string; name: string; order: number };
     items: Array<{
@@ -109,6 +108,17 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
   const syncContext = useSync();
   const router = useRouter();
   const pollingRef = useRef(false);
+  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshJobIdRef = useRef<string | null>(null);
+
+  const stopRefreshPolling = useCallback(() => {
+    pollingRef.current = false;
+    refreshJobIdRef.current = null;
+    if (pollingTimerRef.current) {
+      clearTimeout(pollingTimerRef.current);
+      pollingTimerRef.current = null;
+    }
+  }, []);
 
   const unwrapApiResult = (result: any) => result?.data ?? result;
   
@@ -129,6 +139,12 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     };
     loadFromCache();
   }, [initialShoppingList.id]);
+
+  useEffect(() => {
+    return () => {
+      stopRefreshPolling();
+    };
+  }, [stopRefreshPolling]);
 
   const handleItemAdded = async () => {
     try {
@@ -171,6 +187,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
 
     setIsRefreshing(true);
     pollingRef.current = true;
+    refreshJobIdRef.current = null;
     
     try {
       // Collect IDs of all active and watchlisted items (exclude completed items)
@@ -194,6 +211,12 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
 
       if (!response.ok) throw new Error("Failed to start price refresh");
 
+      const payload = await response.json();
+      refreshJobIdRef.current = payload?.jobId ?? payload?.data?.jobId ?? null;
+      if (!refreshJobIdRef.current) {
+        throw new Error("Refresh job ID was not returned");
+      }
+
       // Poll for updates every 3 seconds
       const pollInterval = 3000;
       
@@ -215,33 +238,54 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
             const freshData = unwrapApiResult(result);
             if (freshData) {
               setShoppingList(freshData);
-              
-              // Stop polling if refresh is complete
-              if (freshData.refreshStatus !== 'refreshing') {
-                pollingRef.current = false;
-                setIsRefreshing(false);
-                toast({
-                  title: "Success",
-                  description: "Prices refreshed successfully",
-                });
-                return;
-              }
             }
           }
         } catch (error) {
           console.error("Error polling for updates:", error);
         }
 
+        // Prefer job status if available
+        if (refreshJobIdRef.current) {
+          try {
+            const statusResponse = await fetch(`${BASE_PATH}/api/refresh-prices/${refreshJobIdRef.current}`, {
+              method: 'GET',
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache',
+              },
+            });
+
+            if (statusResponse.ok) {
+              const statusResult = await statusResponse.json();
+              const statusData = statusResult?.data ?? statusResult;
+              const refreshStatus = statusData?.status;
+
+              if (refreshStatus === 'completed' || refreshStatus === 'failed') {
+                stopRefreshPolling();
+                setIsRefreshing(false);
+                toast({
+                  title: refreshStatus === 'failed' ? "Error" : "Success",
+                  description: refreshStatus === 'failed' ? "Price refresh ended with errors" : "Prices refreshed successfully",
+                  variant: refreshStatus === 'failed' ? 'destructive' : undefined,
+                });
+                return;
+              }
+            }
+          } catch (error) {
+            console.error("Error polling refresh job status:", error);
+          }
+        }
+
         // Continue polling if still active
         if (pollingRef.current) {
-          setTimeout(pollForUpdates, pollInterval);
+          pollingTimerRef.current = setTimeout(pollForUpdates, pollInterval);
         }
       };
 
       // Start polling after initial delay
-      setTimeout(pollForUpdates, pollInterval);
+      pollingTimerRef.current = setTimeout(pollForUpdates, pollInterval);
     } catch (error) {
-      pollingRef.current = false;
+      stopRefreshPolling();
       toast({
         title: "Error",
         description: "Failed to start price refresh",

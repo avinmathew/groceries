@@ -5,6 +5,8 @@ process.env.DATABASE_URL = 'file:./e2e.db';
 const prisma = new PrismaClient();
 
 export async function resetDatabase() {
+  await prisma.refreshJobLink.deleteMany();
+  await prisma.refreshJob.deleteMany();
   await prisma.priceHistory.deleteMany();
   await prisma.productLink.deleteMany();
   await prisma.shoppingListItem.deleteMany();
@@ -18,9 +20,9 @@ export async function disconnectDatabase() {
   await prisma.$disconnect();
 }
 
-export async function createShoppingList(name: string, refreshStatus: 'idle' | 'refreshing' = 'idle') {
+export async function createShoppingList(name: string) {
   return prisma.shoppingList.create({
-    data: { name, refreshStatus },
+    data: { name },
   });
 }
 
@@ -95,9 +97,3 @@ export async function createPriceHistory(options: {
   });
 }
 
-export async function updateShoppingListRefreshStatus(listId: string, status: 'idle' | 'refreshing') {
-  return prisma.shoppingList.update({
-    where: { id: listId },
-    data: { refreshStatus: status },
-  });
-}
