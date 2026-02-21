@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,9 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
   const [searchQuery, setSearchQuery] = useState("");
   const [groceries, setGroceries] = useState<Grocery[]>([]);
   const [filteredGroceries, setFilteredGroceries] = useState<Grocery[]>([]);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [isLoading, setIsLoading] = useState(false);
+  const resultRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const router = useRouter();
   const { toast } = useToast();
   const { isOnline, sync, updatePendingCount } = useSync();
@@ -77,6 +79,21 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
     setFilteredGroceries(filtered);
   }, [searchQuery, groceries]);
 
+  useEffect(() => {
+    setActiveIndex((prev) => {
+      if (filteredGroceries.length === 0) {
+        return -1;
+      }
+      return prev >= filteredGroceries.length ? filteredGroceries.length - 1 : prev;
+    });
+  }, [filteredGroceries]);
+
+  useEffect(() => {
+    if (activeIndex >= 0) {
+      resultRefs.current[activeIndex]?.scrollIntoView({ block: "nearest" });
+    }
+  }, [activeIndex]);
+
   const handleSelectGrocery = async (groceryName: string) => {
     setIsLoading(true);
     try {
@@ -108,6 +125,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
 
       setOpen(false);
       setSearchQuery("");
+      setActiveIndex(-1);
       onItemAdded?.();
       
       if (isOnline) {
@@ -147,11 +165,38 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
         <Input
           placeholder="Type to search..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setActiveIndex(-1);
+          }}
           autoFocus
           autoCapitalize="none"
           onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              if (filteredGroceries.length > 0) {
+                e.preventDefault();
+                setActiveIndex((prev) => (prev < 0 ? 0 : (prev + 1) % filteredGroceries.length));
+              }
+              return;
+            }
+
+            if (e.key === "ArrowUp") {
+              if (filteredGroceries.length > 0) {
+                e.preventDefault();
+                setActiveIndex((prev) =>
+                  prev < 0 ? filteredGroceries.length - 1 : (prev - 1 + filteredGroceries.length) % filteredGroceries.length
+                );
+              }
+              return;
+            }
+
             if (e.key === "Enter" && searchQuery.trim()) {
+              if (activeIndex >= 0 && filteredGroceries[activeIndex]) {
+                e.preventDefault();
+                handleSelectGrocery(filteredGroceries[activeIndex].name);
+                return;
+              }
+
               const exactMatch = filteredGroceries.find(
                 (g) => g.name.toLowerCase() === searchQuery.trim().toLowerCase()
               );
@@ -169,8 +214,12 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
               {filteredGroceries.map((grocery, index) => (
                 <button
                   key={`${grocery.name}-${index}`}
+                  ref={(el) => {
+                    resultRefs.current[index] = el;
+                  }}
                   onClick={() => handleSelectGrocery(grocery.name)}
-                  className="w-full text-left px-3 py-2 rounded hover:bg-accent"
+                  className={`w-full text-left px-3 py-2 rounded hover:bg-accent ${activeIndex === index ? "bg-accent" : ""}`}
+                  aria-selected={activeIndex === index}
                 >
                   <span className="font-medium">{grocery.name}</span>
                   {grocery.shoppingLists.length > 0 && (
