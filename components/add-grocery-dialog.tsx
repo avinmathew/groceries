@@ -219,7 +219,6 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
                   }}
                   onClick={() => handleSelectGrocery(grocery.name)}
                   className={`w-full text-left px-3 py-2 rounded hover:bg-accent ${activeIndex === index ? "bg-accent" : ""}`}
-                  aria-selected={activeIndex === index}
                 >
                   <span className="font-medium">{grocery.name}</span>
                   {grocery.shoppingLists.length > 0 && (
