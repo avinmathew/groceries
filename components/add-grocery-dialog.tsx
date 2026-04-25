@@ -45,9 +45,20 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
   const { isOnline, sync, updatePendingCount } = useSync();
 
   useEffect(() => {
-    // Fetch all existing groceries for autocomplete
+    if (!open) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    // Refresh existing groceries each time the dialog opens so the search list
+    // doesn't get stuck with stale or empty data from an earlier fetch.
     offlineFetch(`${BASE_PATH}/api/groceries`)
       .then((response) => {
+        if (isCancelled) {
+          return;
+        }
+
         const data = response?.data || response;
         if (Array.isArray(data)) {
           const normalized = data.map((item) => ({
@@ -57,13 +68,16 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
           }));
 
           setGroceries(normalized);
-          setFilteredGroceries(normalized);
         }
       })
       .catch(() => {
-        // If endpoint doesn't exist, that's okay - we'll just use the search
+        // If endpoint doesn't exist, that's okay - we'll just use the current input.
       });
-  }, []);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     const query = searchQuery.trim().toLowerCase();
