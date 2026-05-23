@@ -218,6 +218,53 @@ describe('GET /api/shopping-lists/[id]', () => {
     expect(response.status).toBe(404);
     expect(data.error).toContain('Shopping list not found');
   });
+
+  it('should keep later items in category groups', async () => {
+    const mockList = {
+      id: '1',
+      name: 'Test List',
+      items: [
+        {
+          id: 'item1',
+          groceryItemId: 'g1',
+          quantity: 1,
+          notes: 'buy next week',
+          status: 'later',
+          completedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          groceryItem: {
+            id: 'g1',
+            name: 'apple',
+            categoryId: 'cat1',
+            category: { id: 'cat1', name: 'Fruits', order: 1 },
+            productLinks: [],
+            shoppingListItems: [{ id: 'item1' }],
+          },
+        },
+      ],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any;
+
+    mockPrisma.shoppingList.findUnique.mockResolvedValue(mockList);
+    mockPrisma.category.findMany.mockResolvedValue([{ id: 'cat1', name: 'Fruits', order: 1 }] as any);
+
+    const request = new NextRequest('http://localhost:3000/api/shopping-lists/1');
+    const response = await GET(request, { params: { id: '1' } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.categoryGroups).toHaveLength(1);
+    expect(data.categoryGroups[0].items).toHaveLength(1);
+    expect(data.categoryGroups[0].items[0]).toMatchObject({
+      id: 'item1',
+      status: 'later',
+      name: 'apple',
+    });
+    expect(data.watchlistItems).toEqual([]);
+    expect(data.completedItems).toEqual([]);
+  });
 });
 
 describe('PATCH /api/shopping-lists/[id]', () => {

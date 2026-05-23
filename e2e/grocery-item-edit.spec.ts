@@ -74,6 +74,39 @@ test('edit notes and category persists to list view', async ({ page }) => {
   await expect(page.getByText('Fruit')).toBeVisible();
 });
 
+test('set status to later from edit view', async ({ page }) => {
+  const weekly = await createShoppingList('Weekly');
+  const apples = await createGroceryItem('Apples');
+  const listItem = await addItemToList({ shoppingListId: weekly.id, groceryItemId: apples.id, quantity: 1 });
+
+  await page.goto(`shopping-lists/${weekly.id}`);
+  await page.waitForLoadState('networkidle');
+  await page.waitForFunction(() => {
+    const h1 = document.querySelector('h1');
+    return h1 && h1.innerText.length > 0;
+  }, { timeout: 30000 });
+  await page.locator('a:has(svg.lucide-info)').first().click();
+
+  const statusSelect = page.getByText('Status').locator('..').getByRole('combobox');
+  await statusSelect.click();
+
+  const [statusResponse] = await Promise.all([
+    page.waitForResponse((res) =>
+      res.status() === 200 &&
+      res.request().method() === 'PATCH' &&
+      res.url().includes(`/api/grocery-items/${listItem.id}`)
+    ),
+    page.getByRole('option', { name: 'Later (Muted)' }).click(),
+  ]);
+
+  expect(statusResponse.request().postDataJSON()).toMatchObject({ status: 'later' });
+
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page).toHaveURL(new RegExp(`/shopping-lists/${weekly.id}$`));
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('button', { name: 'Mark Apples for now' })).toBeVisible();
+});
+
 test('add product link appears in list', async ({ page }) => {
   const weekly = await createShoppingList('Weekly');
   const apples = await createGroceryItem('Apples');

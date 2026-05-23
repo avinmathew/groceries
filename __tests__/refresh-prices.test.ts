@@ -21,6 +21,16 @@ jest.mock('@/lib/db', () => ({
     priceHistory: {
       create: jest.fn(),
     },
+    refreshJob: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    refreshJobLink: {
+      createMany: jest.fn(),
+      update: jest.fn(),
+    },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -35,9 +45,19 @@ const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const mockScrapePrice = scrapePrice as jest.MockedFunction<typeof scrapePrice>;
 const mockShouldRefreshPrice = shouldRefreshPrice as jest.MockedFunction<typeof shouldRefreshPrice>;
 
+const setDefaultRefreshJobMocks = () => {
+  mockPrisma.refreshJob.create.mockResolvedValue({ id: 'job-1' } as any);
+  mockPrisma.refreshJob.update.mockResolvedValue({} as any);
+  mockPrisma.refreshJob.findUnique.mockResolvedValue({ failedLinks: 0 } as any);
+  mockPrisma.refreshJobLink.createMany.mockResolvedValue({ count: 0 } as any);
+  mockPrisma.refreshJobLink.update.mockResolvedValue({} as any);
+  mockPrisma.$transaction.mockImplementation(async (operations: any[]) => Promise.all(operations));
+};
+
 describe('POST /api/refresh-prices - Single Item Strategy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    setDefaultRefreshJobMocks();
   });
 
   it('should refresh prices for a single grocery item', async () => {
@@ -138,16 +158,15 @@ describe('POST /api/refresh-prices - Single Item Strategy', () => {
     const response = await POST(request);
     const data = await response.json();
 
-    // Now returns 200 immediately and errors are logged in background
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.message).toContain('Price refresh started');
+    expect(response.status).toBe(500);
+    expect(data.error).toContain('Failed to start price refresh');
   });
 });
 
 describe('POST /api/refresh-prices - Multiple Items Strategy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    setDefaultRefreshJobMocks();
   });
 
   it('should refresh prices for multiple grocery items', async () => {
@@ -219,6 +238,7 @@ describe('POST /api/refresh-prices - Multiple Items Strategy', () => {
 describe('POST /api/refresh-prices - All Items Strategy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    setDefaultRefreshJobMocks();
   });
 
   it('should refresh all items when no parameters provided', async () => {
@@ -324,6 +344,7 @@ describe('POST /api/refresh-prices - All Items Strategy', () => {
 describe('POST /api/refresh-prices - Price History', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    setDefaultRefreshJobMocks();
   });
 
   it('should create price history when price changes', async () => {
@@ -438,6 +459,7 @@ describe('POST /api/refresh-prices - Price History', () => {
 describe('POST /api/refresh-prices - Error Handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    setDefaultRefreshJobMocks();
   });
 
   it('should handle scraping errors gracefully and continue', async () => {

@@ -405,6 +405,45 @@ describe('PATCH /api/grocery-items/[id]', () => {
     expect(response.status).toBe(200);
     expect(data.data.groceryItem.name).toBe('');
   });
+
+  it('should update shopping list item to later without preserving completedAt', async () => {
+    const updatedSli = {
+      id: '1',
+      groceryItemId: 'g1',
+      quantity: 1,
+      status: 'later',
+      completedAt: null,
+      groceryItem: {},
+    } as any;
+
+    mockPrisma.shoppingListItem.update.mockResolvedValue(updatedSli);
+
+    const request = new NextRequest('http://localhost:3000/api/grocery-items/1', {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'later' }),
+    });
+
+    const response = await PATCH(request, { params: { id: '1' } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.status).toBe('later');
+    expect(mockPrisma.shoppingListItem.update).toHaveBeenCalledWith({
+      where: { id: '1' },
+      data: {
+        status: 'later',
+        completedAt: null,
+      },
+      include: {
+        groceryItem: {
+          include: {
+            category: true,
+            productLinks: true,
+          },
+        },
+      },
+    });
+  });
 });
 
 describe('DELETE /api/grocery-items/[id]', () => {

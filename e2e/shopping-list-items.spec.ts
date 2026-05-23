@@ -4,6 +4,7 @@ import {
   createShoppingList,
   createGroceryItem,
   addItemToList,
+  createProductLink,
 } from './seed';
 import { clearClientState, setupDebugging } from './test-utils';
 
@@ -95,6 +96,38 @@ test('cross off and restore item', async ({ page }) => {
 
   expect(restoreRequest.postDataJSON()).toMatchObject({ status: 'active' });
   await expect(page.getByText('Crossed off')).toBeHidden();
+});
+
+test('mark active item for later and exclude it from the total', async ({ page }) => {
+  const weekly = await createShoppingList('Weekly');
+  const apples = await createGroceryItem('Apples');
+  const listItem = await addItemToList({ shoppingListId: weekly.id, groceryItemId: apples.id, quantity: 1 });
+  await createProductLink({
+    groceryItemId: apples.id,
+    url: 'https://example.com/apples',
+    store: 'woolworths',
+    regularPrice: 4.5,
+  });
+
+  await page.goto(`shopping-lists/${weekly.id}`);
+  await page.waitForLoadState('networkidle');
+  await page.waitForFunction(() => {
+    const h1 = document.querySelector('h1');
+    return h1 && h1.innerText.length > 0;
+  }, { timeout: 30000 });
+
+  const totalSection = page.getByText('Total:').locator('..');
+  await expect(totalSection).toContainText('$4.50');
+
+  const [laterRequest] = await Promise.all([
+    page.waitForRequest((req) => req.method() === 'PATCH' && req.url().includes(`/api/grocery-items/${listItem.id}`)),
+    page.getByRole('button', { name: 'Mark Apples for later' }).click(),
+  ]);
+
+  expect(laterRequest.postDataJSON()).toMatchObject({ status: 'later' });
+  await expect(page.getByRole('button', { name: 'Mark Apples for now' })).toBeVisible();
+  await expect(page.getByText('Apples')).toBeVisible();
+  await expect(totalSection).toBeHidden();
 });
 
 test('delete grocery item from all lists', async ({ page }) => {

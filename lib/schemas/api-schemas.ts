@@ -22,7 +22,7 @@ export const updateShoppingListItemSchema = z.object({
   quantity: z.number().int().min(1).optional(),
   notes: z.string().trim().nullable().optional(),
   categoryId: z.string().nullable().optional(),
-  status: z.enum(['active', 'watchlisted', 'completed']).optional(),
+  status: z.enum(['active', 'later', 'watchlisted', 'completed']).optional(),
 });
 
 export const addItemToShoppingListSchema = z.object({

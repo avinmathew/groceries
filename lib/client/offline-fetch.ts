@@ -321,8 +321,10 @@ export async function getCachedResponse<T>(url: string): Promise<T | null> {
         })
       );
       
+      const activeSectionStatuses = new Set(['active', 'later']);
+
       // Separate items by status
-      const activeItems = enrichedItems.filter(item => item.status === 'active');
+      const activeItems = enrichedItems.filter(item => activeSectionStatuses.has(item.status));
       const watchlistItems = enrichedItems.filter(item => item.status === 'watchlisted');
       const completedItems = enrichedItems
         .filter(item => item.status === 'completed')

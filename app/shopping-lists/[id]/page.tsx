@@ -28,8 +28,10 @@ async function getShoppingList(id: string) {
     orderBy: { order: "asc" },
   });
 
+  const activeSectionStatuses = new Set(['active', 'later']);
+
   // Separate items by status
-  const activeItems = shoppingList.items.filter((item) => item.status === 'active');
+  const activeItems = shoppingList.items.filter((item) => activeSectionStatuses.has(item.status));
   const watchlistItems = shoppingList.items.filter((item) => item.status === 'watchlisted');
   const completedItems = shoppingList.items
     .filter((item) => item.status === 'completed')

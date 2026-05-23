@@ -387,7 +387,7 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
             await offlineDB.shoppingListItems.put({
               ...item,
               status: newStatus,
-              completedAt: newStatus === 'completed' ? new Date().toISOString() : item.completedAt,
+              completedAt: newStatus === 'completed' ? new Date().toISOString() : null,
               updatedAt: new Date().toISOString(),
               _synced: false,
             });
@@ -397,6 +397,56 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
       );
       
       // Trigger sync if online
+      if (isOnline) {
+        await sync();
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: isOnline ? "Failed to update item" : "Update queued for sync",
+        variant: isOnline ? "destructive" : "default",
+      });
+    }
+  };
+
+  const handleToggleLater = async (itemId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'later' ? 'active' : 'later';
+
+    setShoppingList((prev) => ({
+      ...prev,
+      categoryGroups: prev.categoryGroups.map((group) => ({
+        ...group,
+        items: group.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                status: newStatus,
+              }
+            : item
+        ),
+      })),
+    }));
+
+    try {
+      await queueMutation(
+        'PATCH',
+        `${BASE_PATH}/api/grocery-items/${itemId}`,
+        { status: newStatus },
+        async () => {
+          const item = await offlineDB.shoppingListItems.get(itemId);
+          if (item) {
+            await offlineDB.shoppingListItems.put({
+              ...item,
+              status: newStatus,
+              completedAt: null,
+              updatedAt: new Date().toISOString(),
+              _synced: false,
+            });
+          }
+          return null;
+        }
+      );
+
       if (isOnline) {
         await sync();
       }
@@ -440,6 +490,10 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
     // Sum up the lowest prices for all active items (not completed)
     shoppingList.categoryGroups.forEach((group) => {
       group.items.forEach((item) => {
+        if (item.status !== 'active') {
+          return;
+        }
+
         const perUnitBase = getPerUnitBase(item.productLinks);
         const prices = item.productLinks
           .map((link) => {
@@ -538,7 +592,9 @@ export function ShoppingListView({ shoppingList: initialShoppingList }: { shoppi
                       item={item}
                       isEditMode={isEditMode}
                       onToggleComplete={() => handleToggleComplete(item.id, item.status)}
+                      onToggleLater={() => handleToggleLater(item.id, item.status)}
                       onItemDeleted={handleItemDeleted}
+                      showLaterToggle
                     />
                   ))}
                 </div>

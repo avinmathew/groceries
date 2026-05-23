@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Info, Trash2, GripVertical } from "lucide-react";
+import { Clock3, Info, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -59,12 +59,16 @@ export function GroceryItemRow({
   onToggleComplete,
   onItemDeleted,
   onStatusChange,
+  onToggleLater,
+  showLaterToggle = false,
 }: {
   item: GroceryItem;
   isEditMode: boolean;
   onToggleComplete: () => void;
   onItemDeleted?: (itemId: string) => void;
   onStatusChange?: (itemId: string, newStatus: string) => void;
+  onToggleLater?: () => void;
+  showLaterToggle?: boolean;
 }) {
   const { toast } = useToast();
   const router = useRouter();
@@ -109,6 +113,7 @@ export function GroceryItemRow({
   };
 
   const displayName = item.quantity > 1 ? `${item.name} (${item.quantity})` : item.name;
+  const isLater = item.status === "later";
 
   const perUnitBase = getPerUnitBase(item.productLinks);
 
@@ -155,7 +160,7 @@ export function GroceryItemRow({
     const isStale = storeLinks.some((link) => isPriceStale(link.lastRefreshed));
     
     return (
-      <div className={`flex items-center gap-1 ${isLowest && !isStale ? "font-semibold text-primary" : ""} ${isStale ? "opacity-40" : ""}`}>
+      <div className={`flex items-center gap-1 ${isLowest && !isStale ? "font-semibold text-primary" : ""} ${isStale ? "opacity-40" : ""} ${isLater ? "opacity-60" : ""}`}>
         <Image
           src={`/store_icons/${storeLower}.webp`}
           alt={store}
@@ -176,10 +181,24 @@ export function GroceryItemRow({
   };
 
   return (
-    <div className="flex items-center gap-2 border-b last:border-b-0 px-3 hover:bg-accent">
+    <div className={`flex items-center gap-2 border-b last:border-b-0 px-3 hover:bg-accent ${isLater ? "bg-muted/30" : ""}`}>
       {isEditMode && (
         <Button variant="ghost" size="icon" className="cursor-grab">
           <GripVertical className="h-4 w-4" />
+        </Button>
+      )}
+
+      {showLaterToggle && onToggleLater && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleLater}
+          aria-label={isLater ? `Mark ${item.name} for now` : `Mark ${item.name} for later`}
+          aria-pressed={isLater}
+          title={isLater ? "Move back to now" : "Move to later"}
+          className={isLater ? "text-muted-foreground bg-muted" : "text-muted-foreground"}
+        >
+          <Clock3 className="h-4 w-4" />
         </Button>
       )}
             
@@ -189,10 +208,10 @@ export function GroceryItemRow({
         disabled={isEditMode}
       >
         <div className={`flex items-center gap-2 ${item.status === 'completed' ? "line-through" : ""}`}>
-          <span className="font-medium">{displayName}</span>
+          <span className={`font-medium ${isLater ? "text-muted-foreground" : ""}`}>{displayName}</span>
         </div>
         {item.notes && (
-          <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>
+          <p className={`text-sm text-muted-foreground mt-1 ${isLater ? "opacity-80" : ""}`}>{item.notes}</p>
         )}
       </button>
       <div className="flex items-center gap-3 ml-auto">

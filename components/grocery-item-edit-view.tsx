@@ -59,6 +59,7 @@ type GroceryItem = {
   name: string;
   quantity: number;
   notes: string | null;
+  status: string;
   categoryId: string | null;
   category: Category | null;
   productLinks: ProductLink[];
@@ -213,7 +214,7 @@ export function GroceryItemEditView({
   const [name, setName] = useState(initialItem.name);
   const [quantity, setQuantity] = useState(initialItem.quantity);
   const [notes, setNotes] = useState(initialItem.notes || "");
-  const [status, setStatus] = useState((initialItem as any).status || "active");
+  const [status, setStatus] = useState(initialItem.status || "active");
   // Use "uncategorised" as a special value instead of empty string for Select
   const [categoryId, setCategoryId] = useState(initialItem.categoryId || "uncategorised");
   const [productLinks, setProductLinks] = useState(initialItem.productLinks);
@@ -914,12 +915,14 @@ export function GroceryItemEditView({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="active">Active (Main List)</SelectItem>
+                <SelectItem value="later">Later (Muted)</SelectItem>
                 <SelectItem value="watchlisted">Watch List</SelectItem>
                 <SelectItem value="completed">Crossed Off</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground mt-2">
               {status === 'active' && 'Item is on your main shopping list'}
+              {status === 'later' && 'Item stays on the main list but is muted until later'}
               {status === 'watchlisted' && 'Watching price - not actively shopping'}
               {status === 'completed' && 'Item is crossed off the list'}
             </p>
