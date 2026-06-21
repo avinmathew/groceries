@@ -26,6 +26,21 @@ type Grocery = {
   shoppingLists: { id: string; name: string }[];
 };
 
+/**
+ * Returns true when every whitespace-separated token in `query` is found as a
+ * substring within at least one whitespace-separated token in `name`.
+ * Matching is case-insensitive and token order is irrelevant.
+ * Examples:
+ *   matchesTokens("brown onions", "onion brown") → true
+ *   matchesTokens("brown onions", "bro oni")     → true
+ *   matchesTokens("brown onions", "garlic")      → false
+ */
+function matchesTokens(name: string, query: string): boolean {
+  const nameTokens = name.toLowerCase().split(/\s+/).filter(Boolean);
+  const queryTokens = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  return queryTokens.every((qt) => nameTokens.some((nt) => nt.includes(qt)));
+}
+
 type AddGroceryDialogProps = {
   shoppingListId: string;
   variant?: "default" | "link";
@@ -87,9 +102,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
       return;
     }
 
-    const filtered = groceries.filter((g) =>
-      g.name.toLowerCase().includes(query)
-    );
+    const filtered = groceries.filter((g) => matchesTokens(g.name, query));
     setFilteredGroceries(filtered);
   }, [searchQuery, groceries]);
 
