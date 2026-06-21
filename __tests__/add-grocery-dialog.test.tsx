@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AddGroceryDialog } from "@/components/add-grocery-dialog";
-import { offlineFetch } from "@/lib/client/offline-fetch";
+import { offlineFetch, queueMutation } from "@/lib/client/offline-fetch";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -36,6 +36,7 @@ jest.mock("@/lib/offline-db", () => ({
 }));
 
 const mockedOfflineFetch = jest.mocked(offlineFetch);
+const mockedQueueMutation = jest.mocked(queueMutation);
 
 describe("AddGroceryDialog", () => {
   beforeAll(() => {
@@ -154,6 +155,86 @@ describe("AddGroceryDialog", () => {
         target: { value: "nut" },
       });
       expect(await screen.findByText("Peanut Butter")).toBeInTheDocument();
+    });
+  });
+
+  describe("quantity stepper", () => {
+    beforeEach(() => {
+      mockedOfflineFetch.mockResolvedValue([]);
+      mockedQueueMutation.mockResolvedValue(null);
+    });
+
+    it("shows quantity stepper with default value of 1 when the dialog opens", async () => {
+      render(<AddGroceryDialog shoppingListId="list-1" variant="link" />);
+      fireEvent.click(screen.getByRole("button", { name: "Add an item..." }));
+      await screen.findByPlaceholderText("Type to search...");
+
+      expect(screen.getByLabelText("Decrease quantity")).toBeInTheDocument();
+      expect(screen.getByLabelText("Increase quantity")).toBeInTheDocument();
+      expect(screen.getByText("1")).toBeInTheDocument();
+    });
+
+    it("increments quantity when + is clicked", async () => {
+      render(<AddGroceryDialog shoppingListId="list-1" variant="link" />);
+      fireEvent.click(screen.getByRole("button", { name: "Add an item..." }));
+      await screen.findByPlaceholderText("Type to search...");
+
+      fireEvent.click(screen.getByLabelText("Increase quantity"));
+      fireEvent.click(screen.getByLabelText("Increase quantity"));
+      expect(screen.getByText("3")).toBeInTheDocument();
+    });
+
+    it("cannot decrease below 1", async () => {
+      render(<AddGroceryDialog shoppingListId="list-1" variant="link" />);
+      fireEvent.click(screen.getByRole("button", { name: "Add an item..." }));
+      await screen.findByPlaceholderText("Type to search...");
+
+      const decreaseBtn = screen.getByLabelText("Decrease quantity");
+      expect(decreaseBtn).toBeDisabled();
+      fireEvent.click(decreaseBtn);
+      expect(screen.getByText("1")).toBeInTheDocument();
+    });
+
+    it("submits the chosen quantity in the request payload when creating a new item", async () => {
+      render(<AddGroceryDialog shoppingListId="list-1" variant="link" />);
+      fireEvent.click(screen.getByRole("button", { name: "Add an item..." }));
+      await screen.findByPlaceholderText("Type to search...");
+
+      fireEvent.click(screen.getByLabelText("Increase quantity"));
+      fireEvent.click(screen.getByLabelText("Increase quantity"));
+
+      fireEvent.change(screen.getByPlaceholderText("Type to search..."), {
+        target: { value: "Milk" },
+      });
+      fireEvent.click(await screen.findByRole("button", { name: /Create "Milk"/ }));
+
+      await waitFor(() => {
+        expect(mockedQueueMutation).toHaveBeenCalledWith(
+          "POST",
+          expect.stringContaining("/api/grocery-items"),
+          expect.objectContaining({ name: "Milk", quantity: 3 }),
+          expect.any(Function)
+        );
+      });
+    });
+
+    it("resets quantity to 1 after the dialog closes", async () => {
+      render(<AddGroceryDialog shoppingListId="list-1" variant="link" />);
+      fireEvent.click(screen.getByRole("button", { name: "Add an item..." }));
+      await screen.findByPlaceholderText("Type to search...");
+
+      fireEvent.click(screen.getByLabelText("Increase quantity"));
+      fireEvent.click(screen.getByLabelText("Increase quantity"));
+      expect(screen.getByText("3")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      await waitFor(() => {
+        expect(screen.queryByPlaceholderText("Type to search...")).not.toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Add an item..." }));
+      await screen.findByPlaceholderText("Type to search...");
+      expect(screen.getByText("1")).toBeInTheDocument();
     });
   });
 });

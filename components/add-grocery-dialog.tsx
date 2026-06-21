@@ -54,6 +54,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
   const [filteredGroceries, setFilteredGroceries] = useState<Grocery[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isLoading, setIsLoading] = useState(false);
+  const [quantity, setQuantity] = useState(1);
   const resultRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const router = useRouter();
   const { toast } = useToast();
@@ -61,6 +62,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
 
   useEffect(() => {
     if (!open) {
+      setQuantity(1);
       return;
     }
 
@@ -130,6 +132,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
         {
           name: groceryName,
           shoppingListId,
+          quantity,
         },
         async () => {
           // Optimistic: add temporary item to cache
@@ -138,7 +141,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
             id: tempId,
             shoppingListId,
             groceryItemId: tempId,
-            quantity: 1,
+            quantity,
             notes: null,
             status: 'active',
             completedAt: null,
@@ -153,6 +156,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
       setOpen(false);
       setSearchQuery("");
       setActiveIndex(-1);
+      setQuantity(1);
       onItemAdded?.();
       
       if (isOnline) {
@@ -189,15 +193,37 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
         <DialogDescription>Type to search for existing items or create a new one.</DialogDescription>
       </DialogHeader>
       <div className="py-4">
-        <Input
-          placeholder="Type to search..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setActiveIndex(-1);
-          }}
-          autoFocus
-          autoCapitalize="none"
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              aria-label="Decrease quantity"
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+              className="h-8 w-8 rounded border flex items-center justify-center text-lg leading-none disabled:opacity-40"
+            >
+              −
+            </button>
+            <span className="w-6 text-center tabular-nums">{quantity}</span>
+            <button
+              type="button"
+              aria-label="Increase quantity"
+              onClick={() => setQuantity((q) => q + 1)}
+              className="h-8 w-8 rounded border flex items-center justify-center text-lg leading-none"
+            >
+              +
+            </button>
+          </div>
+          <Input
+            placeholder="Type to search..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setActiveIndex(-1);
+            }}
+            autoFocus
+            autoCapitalize="none"
+            className="flex-1"
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               if (filteredGroceries.length > 0) {
@@ -234,7 +260,8 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
               }
             }
           }}
-        />
+          />
+        </div>
         <div className="mt-2 max-h-[60vh] overflow-y-auto space-y-1">
           {filteredGroceries.length > 0 ? (
             <>

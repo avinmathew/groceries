@@ -46,7 +46,7 @@ test('add a brand-new grocery item from dialog', async ({ page }) => {
   await expect(page.getByText('Uncategorised')).toBeVisible();
 });
 
-test('adding existing active item increments quantity', async ({ page }) => {
+test('adding existing active item from dialog sets quantity to chosen value', async ({ page }) => {
   const weekly = await createShoppingList('Weekly');
   const apples = await createGroceryItem('Apples');
   await addItemToList({ shoppingListId: weekly.id, groceryItemId: apples.id, quantity: 1 });
@@ -58,6 +58,11 @@ test('adding existing active item increments quantity', async ({ page }) => {
     return h1 && h1.innerText.length > 0;
   }, { timeout: 30000 });
   await page.getByRole('button', { name: 'Add an item...' }).click();
+
+  // Increase quantity to 3 before selecting the item
+  await page.getByLabel('Increase quantity').click();
+  await page.getByLabel('Increase quantity').click();
+
   await page.getByPlaceholder('Type to search...').fill('Apples');
 
   const [request] = await Promise.all([
@@ -65,8 +70,8 @@ test('adding existing active item increments quantity', async ({ page }) => {
     page.getByRole('button', { name: 'Apples' }).click(),
   ]);
 
-  expect(request.postDataJSON()).toMatchObject({ name: 'Apples', shoppingListId: weekly.id });
-  await expect(page.getByText('Apples (2)')).toBeVisible();
+  expect(request.postDataJSON()).toMatchObject({ name: 'Apples', shoppingListId: weekly.id, quantity: 3 });
+  await expect(page.getByText('Apples (3)')).toBeVisible();
 });
 
 test('cross off and restore item', async ({ page }) => {

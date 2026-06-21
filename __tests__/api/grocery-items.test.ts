@@ -178,7 +178,7 @@ describe('POST /api/grocery-items', () => {
     });
   });
 
-  it('should increase quantity by 1 when adding an existing uncrossed item', async () => {
+  it('should set quantity to requested value when adding an existing uncrossed item', async () => {
     const mockGrocery = {
       id: 'g1',
       name: 'Existing Item',
@@ -201,7 +201,66 @@ describe('POST /api/grocery-items', () => {
 
     const updatedShoppingListItem = {
       ...existingShoppingListItem,
-      quantity: 3,
+      quantity: 5,
+      groceryItem: mockGrocery,
+    } as any;
+
+    mockPrisma.groceryItem.findFirst.mockResolvedValue(mockGrocery as any);
+    mockPrisma.shoppingListItem.findFirst.mockResolvedValue(existingShoppingListItem as any);
+    mockPrisma.shoppingListItem.update.mockResolvedValue(updatedShoppingListItem as any);
+
+    const request = new NextRequest('http://localhost:3000/api/grocery-items', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Existing Item', shoppingListId: 'list1', quantity: 5 }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(mockPrisma.shoppingListItem.update).toHaveBeenCalledWith({
+      where: { id: 'sli1' },
+      data: {
+        status: 'active',
+        completedAt: null,
+        quantity: 5,
+      },
+      include: {
+        groceryItem: {
+          include: {
+            category: true,
+            productLinks: true,
+          },
+        },
+      },
+    });
+    expect(data.data.quantity).toBe(5);
+  });
+
+  it('should default to quantity 1 when re-adding an existing uncrossed item without specifying quantity', async () => {
+    const mockGrocery = {
+      id: 'g1',
+      name: 'Existing Item',
+      category: null,
+      productLinks: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const existingShoppingListItem = {
+      id: 'sli1',
+      quantity: 2,
+      status: 'active',
+      completedAt: null,
+      shoppingListId: 'list1',
+      groceryItemId: 'g1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const updatedShoppingListItem = {
+      ...existingShoppingListItem,
+      quantity: 1,
       groceryItem: mockGrocery,
     } as any;
 
@@ -223,7 +282,7 @@ describe('POST /api/grocery-items', () => {
       data: {
         status: 'active',
         completedAt: null,
-        quantity: 3,
+        quantity: 1,
       },
       include: {
         groceryItem: {
@@ -234,10 +293,10 @@ describe('POST /api/grocery-items', () => {
         },
       },
     });
-    expect(data.data.quantity).toBe(3);
+    expect(data.data.quantity).toBe(1);
   });
 
-  it('should not change quantity when adding an existing crossed-off item', async () => {
+  it('should set quantity to requested value when adding an existing crossed-off item', async () => {
     const mockGrocery = {
       id: 'g1',
       name: 'Crossed Off Item',
@@ -262,6 +321,7 @@ describe('POST /api/grocery-items', () => {
       ...existingShoppingListItem,
       status: 'active',
       completedAt: null,
+      quantity: 1,
       groceryItem: mockGrocery,
     } as any;
 
@@ -283,6 +343,7 @@ describe('POST /api/grocery-items', () => {
       data: {
         status: 'active',
         completedAt: null,
+        quantity: 1,
       },
       include: {
         groceryItem: {
@@ -293,8 +354,7 @@ describe('POST /api/grocery-items', () => {
         },
       },
     });
-    // Quantity should remain 3, not incremented
-    expect(data.data.quantity).toBe(3);
+    expect(data.data.quantity).toBe(1);
   });
 });
 
