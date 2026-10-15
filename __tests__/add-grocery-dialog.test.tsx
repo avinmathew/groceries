@@ -85,6 +85,28 @@ describe("AddGroceryDialog", () => {
     expect(mockedOfflineFetch).toHaveBeenCalledTimes(2);
   });
 
+  it("marks items that are active on a shopping list", async () => {
+    mockedOfflineFetch.mockResolvedValue([
+      {
+        name: "Apples",
+        categoryId: null,
+        shoppingLists: [
+          { id: "active-list", name: "Weekly", status: "active" },
+          { id: "later-list", name: "Next trip", status: "later" },
+          { id: "completed-list", name: "Last week", status: "completed" },
+        ],
+      },
+    ]);
+
+    render(<AddGroceryDialog shoppingListId="shopping-list-1" variant="link" />);
+    fireEvent.click(screen.getByRole("button", { name: "Add an item..." }));
+
+    expect(await screen.findByText("Apples")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Active on Weekly" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Later on Next trip" })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Active on Last week" })).not.toBeInTheDocument();
+  });
+
   describe("token-based filtering", () => {
     const groceries = [
       { name: "Brown Onions", categoryId: null, shoppingLists: [] },

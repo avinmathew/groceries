@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus } from "lucide-react";
+import { CheckCircle2, Clock3, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ type Grocery = {
   id?: string;
   name: string;
   categoryId: string | null;
-  shoppingLists: { id: string; name: string }[];
+  shoppingLists: { id: string; name: string; status: string }[];
 };
 
 /**
@@ -277,7 +277,28 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
                   <span className="font-medium">{grocery.name}</span>
                   {grocery.shoppingLists.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      On {grocery.shoppingLists.map((list) => list.name).join(", ")}
+                      On {grocery.shoppingLists.map((list, listIndex) => (
+                        <span key={list.id}>
+                          {listIndex > 0 && ", "}
+                          <span className="inline-flex items-center gap-1">
+                            <span>{list.name}</span>
+                            {list.status === "active" && (
+                              <CheckCircle2
+                                className="h-3.5 w-3.5 shrink-0 -translate-y-px text-green-600"
+                                aria-label={`Active on ${list.name}`}
+                                role="img"
+                              />
+                            )}
+                            {list.status === "later" && (
+                              <Clock3
+                                className="h-3.5 w-3.5 shrink-0 -translate-y-px text-muted-foreground"
+                                aria-label={`Later on ${list.name}`}
+                                role="img"
+                              />
+                            )}
+                          </span>
+                        </span>
+                      ))}
                     </p>
                   )}
                 </button>
@@ -318,7 +339,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
             Add an item...
           </button>
         </DialogTrigger>
-        <DialogContent className="inset-x-0 top-2 translate-x-0 translate-y-0 mx-auto w-[calc(100vw-1rem)] max-h-[calc(100dvh-2rem)] rounded-none sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:max-h-[80vh] sm:rounded-lg">
+        <DialogContent className="w-[calc(100vw-1rem)] max-h-[calc(100dvh-2rem)] rounded-none sm:max-w-lg sm:max-h-[80vh] sm:rounded-lg">
           {dialogContent}
         </DialogContent>
       </Dialog>
@@ -332,7 +353,7 @@ export function AddGroceryDialog({ shoppingListId, variant = "default", onItemAd
           <Plus className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="inset-x-0 top-2 translate-x-0 translate-y-0 mx-auto w-[calc(100vw-1rem)] max-h-[calc(100dvh-2rem)] rounded-none sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:max-h-[80vh] sm:rounded-lg">
+      <DialogContent className="w-[calc(100vw-1rem)] max-h-[calc(100dvh-2rem)] rounded-none sm:max-w-lg sm:max-h-[80vh] sm:rounded-lg">
         {dialogContent}
       </DialogContent>
     </Dialog>

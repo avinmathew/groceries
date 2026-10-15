@@ -33,7 +33,7 @@ export async function GET() {
       id: string;
       name: string;
       categoryId: string | null;
-      shoppingLists: Map<string, { id: string; name: string }>;
+      shoppingLists: Map<string, { id: string; name: string; status: string }>;
     };
 
     const groceryMap = new Map<string, GroceryAggregate>();
@@ -43,16 +43,20 @@ export async function GET() {
         id: item.id,
         name: item.name,
         categoryId: item.categoryId,
-        shoppingLists: new Map<string, { id: string; name: string }>(),
+        shoppingLists: new Map<string, { id: string; name: string; status: string }>(),
       };
 
 
       // Track all lists where the item appears (including completed)
       for (const sli of item.shoppingListItems) {
-        current.shoppingLists.set(sli.shoppingList.id, {
-          id: sli.shoppingList.id,
-          name: sli.shoppingList.name,
-        });
+        const existingMembership = current.shoppingLists.get(sli.shoppingList.id);
+        if (!existingMembership || sli.status === "active") {
+          current.shoppingLists.set(sli.shoppingList.id, {
+            id: sli.shoppingList.id,
+            name: sli.shoppingList.name,
+            status: sli.status,
+          });
+        }
       }
 
       groceryMap.set(item.name, current);
